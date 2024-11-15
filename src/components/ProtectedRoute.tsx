@@ -2,10 +2,18 @@ import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth(); // Supondo que você tenha um hook para acessar o contexto de autenticação
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
 
-  return user ? children : <Navigate to="/" />;
+const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Carregando...</div>;
+  }
+
+  return user ? <>{children}</> : <Navigate to="/" />;
 };
 
 export default ProtectedRoute;

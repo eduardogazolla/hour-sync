@@ -8,7 +8,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { format } from "date-fns";
@@ -27,7 +26,6 @@ const TimeTrackingPage = () => {
   const navigate = useNavigate();
   const userId = auth.currentUser?.uid;
   const today = format(new Date(), "yyyy-MM-dd");
-
   const logoutTimeLimit = 30 * 60 * 1000; // 30 minutos em milissegundos
 
   // Função para logout manual
@@ -115,22 +113,28 @@ const TimeTrackingPage = () => {
     }
   }, [userId]);
 
-  // Função para registrar o próximo ponto
-  const handleRegister = async () => {
+  // Função para registrar entrada ou saída
+  const handleRegister = async (type: "entrada" | "saida") => {
     if (!userId || !serverTime) return;
 
-    const nextAction = !timeEntries.entradaManha
-      ? "entradaManha"
-      : !timeEntries.saidaManha
-      ? "saidaManha"
-      : !timeEntries.entradaTarde
-      ? "entradaTarde"
-      : !timeEntries.saidaTarde
-      ? "saidaTarde"
-      : null;
+    let action: string | null = null;
 
-    if (!nextAction) {
-      setMessage("Todos os pontos do dia já foram registrados.");
+    if (type === "entrada") {
+      action = !timeEntries.entradaManha
+        ? "entradaManha"
+        : !timeEntries.entradaTarde
+        ? "entradaTarde"
+        : null;
+    } else {
+      action = !timeEntries.saidaManha
+        ? "saidaManha"
+        : !timeEntries.saidaTarde
+        ? "saidaTarde"
+        : null;
+    }
+
+    if (!action) {
+      setMessage(`Todos os pontos de ${type} do dia já foram registrados.`);
       return;
     }
 
@@ -138,16 +142,20 @@ const TimeTrackingPage = () => {
       const newEntry = {
         userId: userId,
         date: today,
-        action: nextAction,
+        action: action,
         timestamp: Timestamp.fromDate(serverTime),
       };
 
       await addDoc(collection(db, "timeLogs"), newEntry);
-      setMessage("Ponto registrado com sucesso!");
+      setMessage(
+        `${type === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`
+      );
 
+      // Atualiza o estado para mostrar o novo ponto na interface
       setTimeEntries((prevEntries) => ({
         ...prevEntries,
-        [nextAction]: serverTime.toLocaleTimeString("pt-BR"),
+        [action as keyof typeof timeEntries]:
+          serverTime.toLocaleTimeString("pt-BR"),
       }));
     } catch (error) {
       console.error("Erro ao registrar o ponto:", error);
@@ -196,12 +204,20 @@ const TimeTrackingPage = () => {
             <span>{timeEntries.saidaTarde || "18:00"}</span>
           </div>
         </div>
-        <button
-          onClick={handleRegister}
-          className="mt-6 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
-        >
-          Registrar
-        </button>
+        <div className="mt-6 flex justify-between gap-4">
+          <button
+            onClick={() => handleRegister("entrada")}
+            className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+          >
+            Registrar Entrada
+          </button>
+          <button
+            onClick={() => handleRegister("saida")}
+            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+          >
+            Registrar Saída
+          </button>
+        </div>
         {message && (
           <p className="mt-4 text-center text-green-400">{message}</p>
         )}

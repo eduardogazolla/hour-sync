@@ -4,30 +4,22 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
-import Dashboard from "./pages/Dashboard";
 import TimeTrackingPage from "./pages/TimeTrackingPage";
+import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
-import AdminDashboard from "./pages/AdminDashboard";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 function App() {
-  const { user } = useAuth();
-
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={user ? <Navigate to="/time-tracking" /> : <LoginPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <AdminRoute>
-                <Dashboard />
-              </AdminRoute>
-            }
-          />
+          {/* Página de login */}
+          <Route path="/" element={<LoginPage />} />
+
+          {/* Página do admin (protegida) */}
           <Route
             path="/admin"
             element={
@@ -36,6 +28,8 @@ function App() {
               </AdminRoute>
             }
           />
+
+          {/* Página de controle de ponto (protegida) */}
           <Route
             path="/time-tracking"
             element={

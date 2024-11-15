@@ -1,11 +1,19 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { useAdminCheck } from "../hooks/useAdminCheck";
+import { useAuth } from "../contexts/AuthContext";
 
-const AdminRoute = ({ children }: { children: ReactNode }) => {
-  const isAdmin = useAdminCheck();
+interface AdminRouteProps {
+  children: ReactNode;
+}
 
-  return isAdmin ? children : <Navigate to="/time-tracking" />;
+const AdminRoute = ({ children }: AdminRouteProps) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Carregando...</div>;
+  }
+
+  return user && user.isAdmin ? <>{children}</> : <Navigate to="/" />;
 };
 
 export default AdminRoute;
