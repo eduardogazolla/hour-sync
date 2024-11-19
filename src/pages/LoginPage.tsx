@@ -12,9 +12,9 @@ const LoginPage = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
     try {
-      // Autentica o usuário
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
@@ -22,26 +22,30 @@ const LoginPage = () => {
       );
       const user = userCredential.user;
 
-      // Verifica se o usuário é admin no Firestore
-      const isAdmin = await checkIfAdmin(user.uid);
-
-      if (isAdmin) {
-        // Redireciona para a página de administração
-        navigate("/admin");
-      } else {
-        // Redireciona para a página de controle de ponto
-        navigate("/time-tracking");
+      // Primeiro verifica na coleção `users`
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData.isAdmin) {
+          navigate("/admin"); // Redireciona para a página do administrador
+        } else {
+          navigate("/time-tracking"); // Redireciona para a página de controle de ponto
+        }
+        return;
       }
-    } catch (error) {
-      console.error("Erro ao fazer login:", error);
-      setError("Falha no login. Verifique suas credenciais.");
-    }
-  };
 
-  // Função para verificar se o usuário é admin no Firestore
-  const checkIfAdmin = async (userId: string) => {
-    const userDoc = await getDoc(doc(db, "users", userId));
-    return userDoc.exists() ? userDoc.data().isAdmin === true : false;
+      // Caso não esteja em `users`, verifica na coleção `employees`
+      const employeeDoc = await getDoc(doc(db, "employees", user.uid));
+      if (employeeDoc.exists()) {
+        navigate("/time-tracking"); // Funcionários só acessam controle de ponto
+        return;
+      }
+
+      setError("Usuário não encontrado em nenhuma coleção.");
+    } catch (error: any) {
+      console.error("Erro ao fazer login:", error.message);
+      setError("Credenciais inválidas. Tente novamente.");
+    }
   };
 
   return (

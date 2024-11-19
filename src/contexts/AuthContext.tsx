@@ -28,19 +28,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+
       if (firebaseUser) {
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            isAdmin: userData.isAdmin || false,
-          });
+        try {
+          // Primeiro verifica na coleção `users`
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              isAdmin: userData.isAdmin || false,
+            });
+          } else {
+            // Caso não encontre em `users`, verifica na coleção `employees`
+            const employeeDoc = await getDoc(
+              doc(db, "employees", firebaseUser.uid)
+            );
+            if (employeeDoc.exists()) {
+              const employeeData = employeeDoc.data();
+              setUser({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || "",
+                isAdmin: false, // Funcionários da coleção `employees` não são admin
+              });
+            } else {
+              console.error(
+                "Usuário autenticado não encontrado em nenhuma coleção."
+              );
+              setUser(null);
+            }
+          }
+        } catch (error) {
+          console.error("Erro ao buscar dados do usuário no Firestore:", error);
+          setUser(null);
         }
       } else {
         setUser(null);
       }
+
       setLoading(false);
     });
 
@@ -56,8 +83,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) {
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
   return context;
 };
