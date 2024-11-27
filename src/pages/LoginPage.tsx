@@ -49,20 +49,30 @@ const LoginPage = () => {
         </h2>
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}
         <form onSubmit={handleLogin} className="space-y-4">
+        <div className="flex flex-col mb-4">
+        <label htmlFor="email" className="text-m text-gray-400 mb-1">
+          Email
+        </label>
           <input
             type="email"
-            placeholder="Email"
+            placeholder="email@exemplo.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
           />
+          </div>
+          <div className="flex flex-col mb-4">
+          <label htmlFor="password" className="text-m text-gray-400 mb-1">
+            Senha
+          </label>
           <input
             type="password"
-            placeholder="Senha"
+            placeholder="••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
           />
+          </div>
           <div className="text-right">
             <button
               type="button"

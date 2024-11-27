@@ -109,8 +109,8 @@ Este projeto é uma aplicação web desenvolvida para gerenciar funcionários e 
 
 ## Melhorias Futuras
 - Adicionar gráficos nos relatórios para visualização de dados.
-- Implementar sistema de permissões mais avançado.
-- Exportar relatórios em formato PDF.
+- Melhoria no documento exportado em PDF.
+- Limitação de uso por IP.
 
 ## Contato
 Para dúvidas ou sugestões, entre em contato com o desenvolvedor.

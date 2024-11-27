@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { Switch } from "@mui/material";
 import { useAuth } from "../contexts/AuthContext";
-import { Edit, Add, ExitToApp, Menu, MenuOpen } from "@mui/icons-material";
+import { Edit, Add, ExitToApp, Menu, MenuOpen, AccessTime } from "@mui/icons-material";
 import EmployeeFormModal from "./EmployeeFormModal";
 import EditEmployeeModal from "./EditEmployeeModal";
 import { auth, db } from "../firebaseConfig";
@@ -97,6 +97,12 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleGoToTimeTracking = () => {
+    navigate("/time-tracking", {
+      state: { userId: user?.uid, userName: user?.displayName },
+    });
+  };
+
   const filterEmployees = (employees: Employee[]) =>
     employees.filter(
       (employee) =>
@@ -132,6 +138,13 @@ const AdminDashboard = () => {
             >
               <Add fontSize="large" />
               {isMenuOpen && <span className="ml-4">Adicionar</span>}
+            </button>
+            <button
+              onClick={handleGoToTimeTracking}
+              className="flex items-center text-gray-300 hover:text-white pl-4"
+            >
+              <AccessTime fontSize="large" />
+              {isMenuOpen && <span className="ml-4">Registrar Ponto</span>}
             </button>
           </div>
         </div>

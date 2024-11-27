@@ -92,86 +92,115 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full text-white">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-lg w-full text-white">
         <h2 className="text-2xl font-semibold mb-4">Cadastrar Novo Funcionário</h2>
         {error && <div className="bg-red-600 p-2 rounded mb-4 text-center">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            name="name"
-            value={formData.name}
-            onChange={handleInputChange}
-            placeholder="Nome"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="cpf"
-            value={formData.cpf}
-            onChange={handleInputChange}
-            placeholder="CPF"
-            maxLength={14}
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="Email"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            placeholder="Senha"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="confirmPassword"
-            type="password"
-            value={formData.confirmPassword}
-            onChange={handleInputChange}
-            placeholder="Confirmar Senha"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="birthDate"
-            value={formData.birthDate}
-            onChange={handleInputChange}
-            placeholder="Data de Nascimento"
-            maxLength={10}
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="address"
-            value={formData.address}
-            onChange={handleInputChange}
-            placeholder="Endereço"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="role"
-            value={formData.role}
-            onChange={handleInputChange}
-            placeholder="Função"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            name="sector"
-            value={formData.sector}
-            onChange={handleInputChange}
-            placeholder="Setor"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col">
+              <label htmlFor="name" className="text-m text-gray-400 mb-1">Nome</label>
+              <input
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="João Pedro"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="cpf" className="text-m text-gray-400 mb-1">CPF</label>
+              <input
+                name="cpf"
+                value={formData.cpf}
+                onChange={handleInputChange}
+                placeholder="123.456.789-10"
+                maxLength={14}
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="email" className="text-m text-gray-400 mb-1">Email</label>
+              <input
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder="email@exemplo.com"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="password" className="text-m text-gray-400 mb-1">Senha</label>
+              <input
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                placeholder="••••••"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="confirmPassword" className="text-m text-gray-400 mb-1">Confirmar Senha</label>
+              <input
+                name="confirmPassword"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                placeholder="••••••"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="birthDate" className="text-m text-gray-400 mb-1">Data de Nascimento</label>
+              <input
+                name="birthDate"
+                value={formData.birthDate}
+                onChange={handleInputChange}
+                placeholder="01/01/2000"
+                maxLength={10}
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="address" className="text-m text-gray-400 mb-1">Endereço</label>
+              <input
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                placeholder="Av. Brasil, 1234"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="role" className="text-m text-gray-400 mb-1">Função</label>
+              <input
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                placeholder="Gerente"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="sector" className="text-m text-gray-400 mb-1">Setor</label>
+              <input
+                name="sector"
+                value={formData.sector}
+                onChange={handleInputChange}
+                placeholder="Escritório"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
@@ -201,6 +230,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
       </div>
     </div>
   );
+  
 };
 
 export default EmployeeFormModal;

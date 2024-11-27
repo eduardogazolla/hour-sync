@@ -3,11 +3,6 @@ import {
   doc,
   setDoc,
   updateDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
   getDoc,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
@@ -22,11 +17,22 @@ const TimeTrackingPage = () => {
     entradaTarde: "",
     saidaTarde: "",
   });
+  const [isAdmin, setIsAdmin] = useState(false); // Verifica se o usuário é administrador
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [userName, setUserName] = useState("");
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
   const navigate = useNavigate();
   const userId = auth.currentUser?.uid;
+
+    // Obtém o displayName do Firebase Auth
+    useEffect(() => {
+      const fetchUserDisplayName = () => {
+        if (auth.currentUser) {
+          setUserDisplayName(auth.currentUser.displayName || "Administrador");
+        }
+      };
+      fetchUserDisplayName();
+    }, []);
 
   // Regras de horários permitidos
   const scheduleLimits = {
@@ -36,7 +42,7 @@ const TimeTrackingPage = () => {
     saidaTarde: { start: "18:00", end: "18:10" },
   };
 
-  // Obtém o horário do servidor ou simula um horário válido
+  // Obtém o horário do servidor
   const fetchServerTime = async () => {
     try {
       const response = await fetch(
@@ -54,17 +60,31 @@ const TimeTrackingPage = () => {
     }
   };
 
-  // Cria um novo documento de registro para o dia, se necessário
+  // Verifica se o usuário é administrador
+  const checkIfAdmin = async () => {
+    if (!userId) return;
+
+    try {
+      const userDoc = await getDoc(doc(db, "employees", userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setIsAdmin(userData.isAdmin || false);
+      }
+    } catch (error) {
+      console.error("Erro ao verificar se o usuário é administrador:", error);
+    }
+  };
+
+  // Cria um novo registro diário, se necessário
   const createDailyLogIfNotExists = async () => {
     if (!userId || !serverTime) return;
 
-    const today = new Date(serverTime).toISOString().split("T")[0]; // Data atual no formato YYYY-MM-DD
+    const today = new Date(serverTime).toISOString().split("T")[0];
     const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
 
-    const docSnapshot = await getDoc(userDocRef);
-
-    if (!docSnapshot.exists()) {
-      try {
+    try {
+      const docSnapshot = await getDoc(userDocRef);
+      if (!docSnapshot.exists()) {
         await setDoc(userDocRef, {
           userId,
           userName: auth.currentUser?.displayName || "",
@@ -76,31 +96,31 @@ const TimeTrackingPage = () => {
             saidaTarde: "",
           },
         });
-        console.log("Novo registro diário criado com sucesso.");
         setTimeEntries({
           entradaManha: "",
           saidaManha: "",
           entradaTarde: "",
           saidaTarde: "",
         });
-      } catch (error) {
-        console.error("Erro ao criar o registro diário:", error);
+      } else {
+        setTimeEntries(docSnapshot.data().entries || {});
       }
-    } else {
-      setTimeEntries(docSnapshot.data().entries || {});
+    } catch (error) {
+      console.error("Erro ao criar ou carregar registro diário:", error);
     }
   };
 
   useEffect(() => {
-    fetchServerTime(); // Busca o horário inicial
-    const interval = setInterval(fetchServerTime, 1000); // Atualiza a cada 1 segundo
-    return () => clearInterval(interval); // Limpa o intervalo ao desmontar o componente
+    fetchServerTime();
+    const interval = setInterval(fetchServerTime, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (userId) {
-      createDailyLogIfNotExists();
-      setUserName(auth.currentUser?.displayName || ""); // Define o nome do usuário logado
+      checkIfAdmin(); // Verifica se o usuário é administrador
+      createDailyLogIfNotExists(); // Cria ou carrega registro diário
+      setUserDisplayName(auth.currentUser?.displayName || "");
     }
   }, [userId, serverTime]);
 
@@ -108,7 +128,7 @@ const TimeTrackingPage = () => {
   const isWithinSchedule = (action: string) => {
     if (!serverTime) return false;
 
-    const currentTime = serverTime.toTimeString().slice(0, 5); // HH:mm
+    const currentTime = serverTime.toTimeString().slice(0, 5);
     const { start, end } = scheduleLimits[action as keyof typeof scheduleLimits];
 
     return currentTime >= start && currentTime <= end;
@@ -116,22 +136,15 @@ const TimeTrackingPage = () => {
 
   // Registra o ponto
   const handleRegister = async (type: "entrada" | "saida") => {
-    if (!userId || !serverTime || !userName) return;
+    if (!userId || !serverTime || !userDisplayName) return;
 
     const today = new Date(serverTime).toISOString().split("T")[0];
-    const actions: { [key: string]: string[] } = {
+    const actions = {
       entrada: ["entradaManha", "entradaTarde"],
       saida: ["saidaManha", "saidaTarde"],
     };
 
-    const availableActions = actions[type];
-    if (!availableActions) {
-      setErrorMessage("Ação inválida. Por favor, tente novamente.");
-      setTimeout(() => setErrorMessage(""), 5000);
-      return;
-    }
-
-    const nextAction = availableActions.find(
+    const nextAction = actions[type].find(
       (action) => !timeEntries[action as keyof typeof timeEntries]
     );
 
@@ -144,22 +157,19 @@ const TimeTrackingPage = () => {
     }
 
     if (!isWithinSchedule(nextAction)) {
-      const attemptedTime = serverTime.toLocaleTimeString("pt-BR"); // Obtém o horário atual formatado
-      setErrorMessage(`Horário inválido para ${type}. (${attemptedTime})`);
+      setErrorMessage(`Horário inválido para ${type}.`);
       setTimeout(() => setErrorMessage(""), 5000);
       return;
     }
 
     try {
       const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
-      const timeToSave = serverTime.toLocaleTimeString("pt-BR").slice(0, 5);
+      const timeToSave = serverTime.toLocaleTimeString("pt-BR");
       await updateDoc(userDocRef, {
         [`entries.${nextAction}`]: timeToSave,
       });
 
-      setMessage(
-        `${type === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`
-      );
+      setMessage(`${type === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`);
       setTimeout(() => setMessage(""), 5000);
 
       setTimeEntries((prevEntries) => ({
@@ -182,8 +192,20 @@ const TimeTrackingPage = () => {
     }
   };
 
+  const handleBackToDashboard = () => {
+    navigate("/admin");
+  };
+
   return (
     <div className="h-screen flex flex-col justify-center items-center bg-gray-900">
+      {isAdmin && (
+        <button
+          onClick={handleBackToDashboard}
+          className="absolute top-4 left-4 bg-gray-700 text-white py-1 px-3 rounded hover:bg-gray-600 transition"
+        >
+          Voltar para Dashboard
+        </button>
+      )}
       <button
         onClick={handleLogout}
         className="absolute top-4 right-4 bg-red-600 text-white py-1 px-3 rounded"
@@ -194,10 +216,8 @@ const TimeTrackingPage = () => {
         <h2 className="text-3xl font-bold text-center text-white mb-2">
           Controle Ponto
         </h2>
-        {userName && (
-          <p className="text-center text-gray-400 mb-6">
-            Bem-vindo, {userName}
-          </p>
+        {userDisplayName && (
+          <p className="text-center text-gray-400 mb-6">Bem-vindo, {userDisplayName}</p>
         )}
         {serverTime ? (
           <p className="text-center text-gray-400 mb-4">
@@ -239,9 +259,7 @@ const TimeTrackingPage = () => {
             Registrar Saída
           </button>
         </div>
-        {message && (
-          <p className="mt-4 text-center text-green-400">{message}</p>
-        )}
+        {message && <p className="mt-4 text-center text-green-400">{message}</p>}
         {errorMessage && (
           <p className="mt-4 text-center text-red-400">{errorMessage}</p>
         )}

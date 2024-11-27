@@ -71,72 +71,95 @@ const EditEmployeeModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full text-white">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-lg w-full text-white">
         <h2 className="text-2xl font-semibold mb-4">Editar {formData.name}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            name="name"
-            value={formData.name}
-            onChange={handleInputChange}
-            placeholder="Nome"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <input
-            name="cpf"
-            value={formData.cpf}
-            onChange={handleInputChange}
-            placeholder="CPF"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <input
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="Email"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <input
-            name="birthDate"
-            value={formData.birthDate}
-            onChange={handleInputChange}
-            placeholder="Data de Nascimento"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <input
-            name="address"
-            value={formData.address}
-            onChange={handleInputChange}
-            placeholder="Endereço Completo"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <input
-            name="role"
-            value={formData.role}
-            onChange={handleInputChange}
-            placeholder="Função"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <input
-            name="sector"
-            value={formData.sector}
-            onChange={handleInputChange}
-            placeholder="Setor"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <div className="flex items-center space-x-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col">
+              <label htmlFor="name" className="text-m text-gray-400 mb-1">Nome</label>
+              <input
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="Nome"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="cpf" className="text-m text-gray-400 mb-1">CPF</label>
+              <input
+                name="cpf"
+                value={formData.cpf}
+                onChange={handleInputChange}
+                placeholder="CPF"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="email" className="text-m text-gray-400 mb-1">Email</label>
+              <input
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder="Email"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="birthDate" className="text-m text-gray-400 mb-1">Data de Nascimento</label>
+              <input
+                name="birthDate"
+                value={formData.birthDate}
+                onChange={handleInputChange}
+                placeholder="Data de Nascimento"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="address" className="text-m text-gray-400 mb-1">Endereço Completo</label>
+              <input
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                placeholder="Endereço Completo"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="role" className="text-m text-gray-400 mb-1">Função</label>
+              <input
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                placeholder="Função"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="sector" className="text-m text-gray-400 mb-1">Setor</label>
+              <input
+                name="sector"
+                value={formData.sector}
+                onChange={handleInputChange}
+                placeholder="Setor"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 mt-4">
             <input
               type="checkbox"
               name="isAdmin"
               checked={formData.isAdmin}
               onChange={handleInputChange}
-              className="h-5 w-5 text-green-600 focus:ring-2 focus:ring-blue-500 rounded"
+              className="form-checkbox h-5 w-5 text-green-600 focus:ring-2 focus:ring-blue-500 rounded"
             />
             <label className="text-white">Administrador</label>
           </div>
@@ -160,6 +183,7 @@ const EditEmployeeModal = ({
       </div>
     </div>
   );
+  
 };
 
 export default EditEmployeeModal;
