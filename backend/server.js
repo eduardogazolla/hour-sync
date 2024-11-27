@@ -1,6 +1,7 @@
 // backend/api.js
 const express = require("express");
 const admin = require("firebase-admin");
+const schedule = require("node-schedule");
 const cors = require("cors");
 
 const app = express();
@@ -11,6 +12,48 @@ app.use(express.json());
 admin.initializeApp({
   credential: admin.credential.cert(require("./serviceAccountKey.json")),
 });
+
+const createDailyLogs = async () => {
+  try {
+    const today = new Date().toISOString().split("T")[0]; // Data atual no formato YYYY-MM-DD
+    const employeesSnapshot = await db.collection("employees").get();
+
+    employeesSnapshot.forEach(async (doc) => {
+      const userId = doc.id;
+      const userName = doc.data().name;
+
+      // Verifica se já existe um registro de ponto para hoje
+      const logsRef = db.collection("timeLogs");
+      const logSnapshot = await logsRef
+        .where("userId", "==", userId)
+        .where("date", "==", today)
+        .get();
+
+      if (logSnapshot.empty) {
+        // Cria um novo registro para hoje
+        await logsRef.add({
+          userId,
+          userName,
+          date: today,
+          entries: {
+            entradaManha: "",
+            saidaManha: "",
+            entradaTarde: "",
+            saidaTarde: "",
+          },
+        });
+        console.log(`Novo registro criado para ${userName}`);
+      }
+    });
+  } catch (error) {
+    console.error("Erro ao criar registros diários:", error);
+  }
+};
+
+// Agendar a verificação para rodar todo dia à meia-noite
+schedule.scheduleJob("0 0 * * *", createDailyLogs);
+
+console.log("Agendamento configurado para criar registros diários.");
 
 // Cria um novo usuário e adiciona no Firestore
 app.post("/create-user", async (req, res) => {

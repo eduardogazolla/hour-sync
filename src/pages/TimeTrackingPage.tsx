@@ -37,29 +37,59 @@ const TimeTrackingPage = () => {
   };
 
   // Obtém o horário do servidor ou simula um horário válido
-const fetchServerTime = async () => {
-  try {
-    const response = await fetch(
-      "https://www.timeapi.io/api/Time/current/zone?timeZone=America/Sao_Paulo"
-    );
-    if (!response.ok) {
-      throw new Error("Erro ao buscar horário do servidor.");
+  const fetchServerTime = async () => {
+    try {
+      const response = await fetch(
+        "https://www.timeapi.io/api/Time/current/zone?timeZone=America/Sao_Paulo"
+      );
+      if (!response.ok) {
+        throw new Error("Erro ao buscar horário do servidor.");
+      }
+      const data = await response.json();
+      const serverTime = new Date(data.dateTime);
+
+      setServerTime(serverTime);
+    } catch (error) {
+      console.error("Erro ao buscar horário do servidor:", error);
     }
-    const data = await response.json();
+  };
 
-    // Se você deseja simular um horário para testes, ajuste aqui
-    const useSimulation = false; // Altere para `false` em produção
-    let serverTime = new Date(data.dateTime);
+  // Cria um novo documento de registro para o dia, se necessário
+  const createDailyLogIfNotExists = async () => {
+    if (!userId || !serverTime) return;
 
-    if (useSimulation) {
-      serverTime.setHours(18, 0, 0); // Simula 08:00 para testes
+    const today = new Date(serverTime).toISOString().split("T")[0]; // Data atual no formato YYYY-MM-DD
+    const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
+
+    const docSnapshot = await getDoc(userDocRef);
+
+    if (!docSnapshot.exists()) {
+      try {
+        await setDoc(userDocRef, {
+          userId,
+          userName: auth.currentUser?.displayName || "",
+          date: today,
+          entries: {
+            entradaManha: "",
+            saidaManha: "",
+            entradaTarde: "",
+            saidaTarde: "",
+          },
+        });
+        console.log("Novo registro diário criado com sucesso.");
+        setTimeEntries({
+          entradaManha: "",
+          saidaManha: "",
+          entradaTarde: "",
+          saidaTarde: "",
+        });
+      } catch (error) {
+        console.error("Erro ao criar o registro diário:", error);
+      }
+    } else {
+      setTimeEntries(docSnapshot.data().entries || {});
     }
-
-    setServerTime(serverTime); // Atualiza o estado
-  } catch (error) {
-    console.error("Erro ao buscar horário do servidor:", error);
-  }
-};
+  };
 
   useEffect(() => {
     fetchServerTime(); // Busca o horário inicial
@@ -67,66 +97,28 @@ const fetchServerTime = async () => {
     return () => clearInterval(interval); // Limpa o intervalo ao desmontar o componente
   }, []);
 
-  // Carrega registros do dia atual
-  const loadTodayEntries = async () => {
-    if (!userId) return;
-  
-    try {
-      // Referência ao documento do usuário em "timeLogs"
-      const userDocRef = doc(db, "timeLogs", userId);
-      const docSnapshot = await getDoc(userDocRef);
-  
-      // Verifica se o documento existe
-      if (docSnapshot.exists()) {
-        const data = docSnapshot.data();
-  
-        // Obtém as entradas salvas no Firestore (se existirem)
-        const entries = data.entries || {};
-  
-        // Atualiza o estado com os dados recuperados
-        setTimeEntries({
-          entradaManha: entries.entradaManha || "",
-          saidaManha: entries.saidaManha || "",
-          entradaTarde: entries.entradaTarde || "",
-          saidaTarde: entries.saidaTarde || "",
-        });
-      } else {
-        // Documento não encontrado, inicializa com valores vazios
-        setTimeEntries({
-          entradaManha: "",
-          saidaManha: "",
-          entradaTarde: "",
-          saidaTarde: "",
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao carregar os pontos do dia:", error);
-    }
-  };
-
   useEffect(() => {
     if (userId) {
-      loadTodayEntries();
+      createDailyLogIfNotExists();
       setUserName(auth.currentUser?.displayName || ""); // Define o nome do usuário logado
     }
-  }, [userId]);
+  }, [userId, serverTime]);
 
   // Verifica se o horário está dentro do permitido
- // Verifica se o horário está dentro do permitido
-const isWithinSchedule = (action: string) => {
-  if (!serverTime) return false;
+  const isWithinSchedule = (action: string) => {
+    if (!serverTime) return false;
 
-  const currentTime = serverTime.toTimeString().slice(0, 5); // HH:mm
-  const { start, end } = scheduleLimits[action as keyof typeof scheduleLimits];
+    const currentTime = serverTime.toTimeString().slice(0, 5); // HH:mm
+    const { start, end } = scheduleLimits[action as keyof typeof scheduleLimits];
 
-  return currentTime >= start && currentTime <= end;
-};
+    return currentTime >= start && currentTime <= end;
+  };
 
   // Registra o ponto
   const handleRegister = async (type: "entrada" | "saida") => {
     if (!userId || !serverTime || !userName) return;
 
-    const today = new Date().toISOString().split("T")[0]; // Formata a data como YYYY-MM-DD
+    const today = new Date(serverTime).toISOString().split("T")[0];
     const actions: { [key: string]: string[] } = {
       entrada: ["entradaManha", "entradaTarde"],
       saida: ["saidaManha", "saidaTarde"],
@@ -159,35 +151,20 @@ const isWithinSchedule = (action: string) => {
     }
 
     try {
-      const userDocRef = doc(db, "timeLogs", userId); // Cria a referência ao documento com o ID do usuário
-      const docSnapshot = await getDoc(userDocRef);
-
-      if (!docSnapshot.exists()) {
-        // Cria um novo documento para o usuário, se ainda não existir
-        await setDoc(userDocRef, {
-          userId,
-          userName,
-          date: today,
-          entries: {
-            [nextAction]: serverTime.toLocaleTimeString("pt-BR"),
-          },
-        });
-      } else {
-        // Atualiza o documento existente adicionando a nova entrada
-        await updateDoc(userDocRef, {
-          [`entries.${nextAction}`]: serverTime.toLocaleTimeString("pt-BR"),
-        });
-      }
+      const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
+      const timeToSave = serverTime.toLocaleTimeString("pt-BR").slice(0, 5);
+      await updateDoc(userDocRef, {
+        [`entries.${nextAction}`]: timeToSave,
+      });
 
       setMessage(
         `${type === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`
       );
       setTimeout(() => setMessage(""), 5000);
 
-      // Atualiza os dados no estado
       setTimeEntries((prevEntries) => ({
         ...prevEntries,
-        [nextAction]: serverTime.toLocaleTimeString("pt-BR"),
+        [nextAction]: timeToSave,
       }));
     } catch (error) {
       console.error("Erro ao registrar ponto:", error);
