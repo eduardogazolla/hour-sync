@@ -56,10 +56,8 @@ app.post("/create-user", async (req, res) => {
 });
 
 app.post("/register-point", async (req, res) => {
-  const { userId, timestamp, type } = req.body; // timestamp e tipo enviados pelo frontend
+  const { userId, timestamp, type } = req.body;
   const currentTime = new Date(timestamp);
-  const dayStart = new Date(currentTime.setHours(0, 0, 0, 0)); // Início do dia
-  const dayEnd = new Date(currentTime.setHours(23, 59, 59, 999)); // Fim do dia
 
   const scheduleLimits = {
     entradaManha: { start: "07:40", end: "08:05" },
@@ -69,42 +67,27 @@ app.post("/register-point", async (req, res) => {
   };
 
   try {
-    // Verifica se o tipo é válido
     if (!scheduleLimits[type]) {
       return res.status(400).send({ error: "Tipo de ponto inválido." });
     }
 
-    // Obtém os limites do tipo
-    const [startHour, startMinute] = scheduleLimits[type].start.split(":");
-    const [endHour, endMinute] = scheduleLimits[type].end.split(":");
-    const startLimit = new Date(
-      currentTime.setHours(startHour, startMinute, 0)
-    );
-    const endLimit = new Date(currentTime.setHours(endHour, endMinute, 59));
+    const { start, end } = scheduleLimits[type];
+    const [startHour, startMinute] = start.split(":");
+    const [endHour, endMinute] = end.split(":");
 
-    // Verifica se está dentro do horário permitido
+    const startLimit = new Date(currentTime);
+    startLimit.setHours(Number(startHour), Number(startMinute), 0);
+
+    const endLimit = new Date(currentTime);
+    endLimit.setHours(Number(endHour), Number(endMinute), 59);
+
     if (currentTime < startLimit || currentTime > endLimit) {
-      return res
-        .status(400)
-        .send({ error: `Horário fora do limite para ${type}.` });
+      return res.status(400).send({
+        error: `Horário fora do limite permitido para ${type}.`,
+      });
     }
 
-    // Verifica se já existem 4 registros para o dia
     const db = admin.firestore();
-    const snapshot = await db
-      .collection("timeTracking")
-      .where("userId", "==", userId)
-      .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(dayStart))
-      .where("timestamp", "<=", admin.firestore.Timestamp.fromDate(dayEnd))
-      .get();
-
-    if (snapshot.size >= 4) {
-      return res
-        .status(400)
-        .send({ error: "Máximo de 4 pontos por dia alcançado." });
-    }
-
-    // Registra o ponto no Firestore
     await db.collection("timeTracking").add({
       userId,
       type,
@@ -113,13 +96,14 @@ app.post("/register-point", async (req, res) => {
 
     res.status(201).send({ message: "Ponto registrado com sucesso!" });
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    console.error("Erro ao registrar ponto:", error);
+    res.status(500).send({ error: "Erro ao registrar ponto." });
   }
 });
 
 // Endpoint para ativar/inativar um usuário
 app.post("/toggle-user-status", async (req, res) => {
-  const { uid, disabled } = req.body; // `uid` do usuário e `disabled` booleano
+  const { uid, disabled } = req.body;
 
   try {
     await admin.auth().updateUser(uid, { disabled });
@@ -127,12 +111,38 @@ app.post("/toggle-user-status", async (req, res) => {
       message: `Usuário ${disabled ? "inativado" : "ativado"} com sucesso.`,
     });
   } catch (error) {
+    console.error("Erro ao atualizar status do usuário:", error);
     res.status(500).send({
-      error: error.message || "Erro ao atualizar status do usuário.",
+      error:
+        error.message ||
+        "Erro ao atualizar status do usuário. Verifique a configuração.",
     });
+  }
+});
+
+app.post("/", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const db = admin.firestore();
+    const snapshot = await db
+      .collection("employees")
+      .where("email", "==", email)
+      .get();
+
+    if (snapshot.empty) {
+      return res.status(404).send({ error: "Usuário não encontrado." });
+    }
+
+    const userData = snapshot.docs[0].data();
+    res.status(200).send({ isAdmin: userData.isAdmin });
+  } catch (error) {
+    res.status(500).send({ error: error.message });
   }
 });
 
 // Iniciar o servidor
 const PORT = 5000;
-app.listen(PORT, () => console.log(`API rodando na porta ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`API rodando na porta http://localhost:${PORT}`)
+);

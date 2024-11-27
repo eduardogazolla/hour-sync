@@ -7,15 +7,16 @@ interface Employee {
   name: string;
   cpf: string;
   email: string;
-  password: string;
-  status: string;
   role: string;
+  sector: string;
   birthDate: string;
   address: string;
+  status: string;
+  isAdmin: boolean;
 }
 
 interface EditEmployeeModalProps {
-  employee: Employee | null; // Permite que o modal inicie vazio
+  employee: Employee | null;
   onClose: () => void;
   onEmployeeUpdated: () => void;
 }
@@ -26,38 +27,46 @@ const EditEmployeeModal = ({
   onEmployeeUpdated,
 }: EditEmployeeModalProps) => {
   const [formData, setFormData] = useState<Employee | null>(employee);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (employee) {
-      setFormData(employee); // Atualiza os dados ao abrir o modal
+      setFormData(employee);
     }
   }, [employee]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target as HTMLInputElement;
+    const newValue = type === "checkbox" ? checked : value;
+
     if (formData) {
-      setFormData({ ...formData, [name]: value });
+      setFormData({ ...formData, [name]: newValue });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (formData) {
+      setLoading(true);
       try {
         const employeeRef = doc(db, "employees", formData.id);
-        await updateDoc(employeeRef, {...formData}); // Atualiza o Firestore
-        onEmployeeUpdated(); // Atualiza a lista de funcionários
-        onClose(); // Fecha o modal após salvar
+        await updateDoc(employeeRef, { ...formData });
+
+        onEmployeeUpdated();
+        onClose();
       } catch (error) {
         console.error("Erro ao atualizar funcionário:", error);
+      } finally {
+        setLoading(false);
       }
     }
   };
 
   if (!formData) {
-    return null; // Retorna nada se o modal abrir sem dados
+    return null;
   }
 
   return (
@@ -90,15 +99,6 @@ const EditEmployeeModal = ({
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
           />
           <input
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            placeholder="Senha"
-            required
-            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          />
-          <input
             name="birthDate"
             value={formData.birthDate}
             onChange={handleInputChange}
@@ -114,26 +114,45 @@ const EditEmployeeModal = ({
             required
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
           />
-          <select
+          <input
             name="role"
             value={formData.role}
             onChange={handleInputChange}
+            placeholder="Função"
             required
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
-          >
-            <option value="">Selecione um cargo</option>
-            <option value="Estagiário">Estagiário</option>
-            <option value="Administrador">Administrador</option>
-          </select>
+          />
+          <input
+            name="sector"
+            value={formData.sector}
+            onChange={handleInputChange}
+            placeholder="Setor"
+            required
+            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
+          />
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              name="isAdmin"
+              checked={formData.isAdmin}
+              onChange={handleInputChange}
+              className="h-5 w-5 text-green-600 focus:ring-2 focus:ring-blue-500 rounded"
+            />
+            <label className="text-white">Administrador</label>
+          </div>
           <button
             type="submit"
-            className="w-full bg-green-600 py-2 rounded hover:bg-green-700 transition text-white font-bold"
+            disabled={loading}
+            className={`w-full bg-green-600 py-2 rounded transition text-white font-bold ${
+              loading ? "opacity-50 cursor-not-allowed" : "hover:bg-green-700"
+            }`}
           >
-            Salvar Alterações
+            {loading ? "Salvando..." : "Salvar Alterações"}
           </button>
         </form>
         <button
           onClick={onClose}
+          disabled={loading}
           className="mt-4 w-full bg-red-600 py-2 rounded hover:bg-red-700 transition text-white font-bold"
         >
           Cancelar

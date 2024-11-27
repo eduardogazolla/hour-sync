@@ -10,6 +10,7 @@ import { auth, db } from "../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 
 interface User {
+  displayName: string;
   uid: string;
   email: string;
   isAdmin: boolean;
@@ -32,33 +33,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (firebaseUser) {
         try {
-          // Primeiro verifica na coleção `users`
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          // Verifica diretamente na coleção `employees`
+          const userDoc = await getDoc(doc(db, "employees", firebaseUser.uid));
+
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setUser({
+              displayName: userData.name || firebaseUser.displayName || "",
               uid: firebaseUser.uid,
               email: firebaseUser.email || "",
-              isAdmin: userData.isAdmin || false,
+              isAdmin: userData.isAdmin || false, // Define se é admin a partir do Firestore
             });
           } else {
-            // Caso não encontre em `users`, verifica na coleção `employees`
-            const employeeDoc = await getDoc(
-              doc(db, "employees", firebaseUser.uid)
+            console.error(
+              "Usuário autenticado não encontrado na coleção employees."
             );
-            if (employeeDoc.exists()) {
-              const employeeData = employeeDoc.data();
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || "",
-                isAdmin: false, // Funcionários da coleção `employees` não são admin
-              });
-            } else {
-              console.error(
-                "Usuário autenticado não encontrado em nenhuma coleção."
-              );
-              setUser(null);
-            }
+            setUser(null);
           }
         } catch (error) {
           console.error("Erro ao buscar dados do usuário no Firestore:", error);

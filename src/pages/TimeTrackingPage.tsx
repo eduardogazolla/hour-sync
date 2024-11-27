@@ -1,19 +1,16 @@
 import { useState, useEffect } from "react";
 import {
-  addDoc,
+  doc,
+  setDoc,
+  updateDoc,
   collection,
-  Timestamp,
   getDocs,
   query,
   where,
   orderBy,
-  serverTimestamp,
-  doc,
   getDoc,
-  setDoc,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
-import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebaseConfig";
 
@@ -30,8 +27,8 @@ const TimeTrackingPage = () => {
   const [userName, setUserName] = useState("");
   const navigate = useNavigate();
   const userId = auth.currentUser?.uid;
-  const today = format(new Date(), "yyyy-MM-dd");
 
+  // Regras de horários permitidos
   const scheduleLimits = {
     entradaManha: { start: "07:40", end: "08:05" },
     saidaManha: { start: "12:00", end: "12:10" },
@@ -39,152 +36,172 @@ const TimeTrackingPage = () => {
     saidaTarde: { start: "18:00", end: "18:10" },
   };
 
-  const getMinutesOfDay = (time: string) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
+  // Obtém o horário do servidor ou simula um horário válido
+const fetchServerTime = async () => {
+  try {
+    const response = await fetch(
+      "https://www.timeapi.io/api/Time/current/zone?timeZone=America/Sao_Paulo"
+    );
+    if (!response.ok) {
+      throw new Error("Erro ao buscar horário do servidor.");
+    }
+    const data = await response.json();
 
-  // Função para obter o horário do servidor
-  const fetchServerTime = async () => {
-    const docRef = doc(collection(db, "serverTime"), "currentTime");
-    await setDoc(docRef, { timestamp: serverTimestamp() }); // Atualiza o horário
-    const snapshot = await getDoc(docRef);
-    const serverTimestampData = snapshot.data()?.timestamp.toDate();
-    setServerTime(serverTimestampData);
-  };
+    // Se você deseja simular um horário para testes, ajuste aqui
+    const useSimulation = false; // Altere para `false` em produção
+    let serverTime = new Date(data.dateTime);
 
-  // Atualiza o horário do servidor ao montar o componente
+    if (useSimulation) {
+      serverTime.setHours(18, 0, 0); // Simula 08:00 para testes
+    }
+
+    setServerTime(serverTime); // Atualiza o estado
+  } catch (error) {
+    console.error("Erro ao buscar horário do servidor:", error);
+  }
+};
+
   useEffect(() => {
-    fetchServerTime();
-    const interval = setInterval(fetchServerTime, 1000);
-    return () => clearInterval(interval);
+    fetchServerTime(); // Busca o horário inicial
+    const interval = setInterval(fetchServerTime, 1000); // Atualiza a cada 1 segundo
+    return () => clearInterval(interval); // Limpa o intervalo ao desmontar o componente
   }, []);
 
-  // Função para logout manual
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/");
-  };
-
-  // Função para carregar registros de ponto do dia atual
+  // Carrega registros do dia atual
   const loadTodayEntries = async () => {
     if (!userId) return;
-
-    const q = query(
-      collection(db, "timeLogs"),
-      where("userId", "==", userId),
-      where("date", "==", today),
-      orderBy("timestamp", "asc")
-    );
-
-    const querySnapshot = await getDocs(q);
-    const entries = {
-      entradaManha: "",
-      saidaManha: "",
-      entradaTarde: "",
-      saidaTarde: "",
-    };
-
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.action === "entradaManha")
-        entries.entradaManha = data.timestamp
-          .toDate()
-          .toLocaleTimeString("pt-BR");
-      if (data.action === "saidaManha")
-        entries.saidaManha = data.timestamp
-          .toDate()
-          .toLocaleTimeString("pt-BR");
-      if (data.action === "entradaTarde")
-        entries.entradaTarde = data.timestamp
-          .toDate()
-          .toLocaleTimeString("pt-BR");
-      if (data.action === "saidaTarde")
-        entries.saidaTarde = data.timestamp
-          .toDate()
-          .toLocaleTimeString("pt-BR");
-    });
-
-    setTimeEntries(entries);
+  
+    try {
+      // Referência ao documento do usuário em "timeLogs"
+      const userDocRef = doc(db, "timeLogs", userId);
+      const docSnapshot = await getDoc(userDocRef);
+  
+      // Verifica se o documento existe
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+  
+        // Obtém as entradas salvas no Firestore (se existirem)
+        const entries = data.entries || {};
+  
+        // Atualiza o estado com os dados recuperados
+        setTimeEntries({
+          entradaManha: entries.entradaManha || "",
+          saidaManha: entries.saidaManha || "",
+          entradaTarde: entries.entradaTarde || "",
+          saidaTarde: entries.saidaTarde || "",
+        });
+      } else {
+        // Documento não encontrado, inicializa com valores vazios
+        setTimeEntries({
+          entradaManha: "",
+          saidaManha: "",
+          entradaTarde: "",
+          saidaTarde: "",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao carregar os pontos do dia:", error);
+    }
   };
 
-  // Carrega as entradas do dia atual ao iniciar a página
   useEffect(() => {
     if (userId) {
       loadTodayEntries();
-      setUserName(auth.currentUser?.displayName || "");
+      setUserName(auth.currentUser?.displayName || ""); // Define o nome do usuário logado
     }
   }, [userId]);
 
-  // Função para determinar o próximo ponto válido
-  const getNextValidAction = () => {
-    if (!serverTime) return null;
+  // Verifica se o horário está dentro do permitido
+ // Verifica se o horário está dentro do permitido
+const isWithinSchedule = (action: string) => {
+  if (!serverTime) return false;
 
-    const currentMinutes = getMinutesOfDay(
-      serverTime.toTimeString().slice(0, 5)
-    );
+  const currentTime = serverTime.toTimeString().slice(0, 5); // HH:mm
+  const { start, end } = scheduleLimits[action as keyof typeof scheduleLimits];
 
-    if (
-      !timeEntries.entradaManha &&
-      currentMinutes <= getMinutesOfDay(scheduleLimits.entradaManha.end)
-    )
-      return "entradaManha";
-    if (
-      !timeEntries.saidaManha &&
-      currentMinutes >= getMinutesOfDay(scheduleLimits.entradaManha.end) &&
-      currentMinutes <= getMinutesOfDay(scheduleLimits.saidaManha.end)
-    )
-      return "saidaManha";
-    if (
-      !timeEntries.entradaTarde &&
-      currentMinutes >= getMinutesOfDay(scheduleLimits.saidaManha.end) &&
-      currentMinutes <= getMinutesOfDay(scheduleLimits.entradaTarde.end)
-    )
-      return "entradaTarde";
-    if (
-      !timeEntries.saidaTarde &&
-      currentMinutes >= getMinutesOfDay(scheduleLimits.entradaTarde.end)
-    )
-      return "saidaTarde";
+  return currentTime >= start && currentTime <= end;
+};
 
-    return null;
-  };
-
-  // Função para registrar entrada ou saída
+  // Registra o ponto
   const handleRegister = async (type: "entrada" | "saida") => {
-    if (!userId || !serverTime) return;
+    if (!userId || !serverTime || !userName) return;
 
-    const nextAction = getNextValidAction();
+    const today = new Date().toISOString().split("T")[0]; // Formata a data como YYYY-MM-DD
+    const actions: { [key: string]: string[] } = {
+      entrada: ["entradaManha", "entradaTarde"],
+      saida: ["saidaManha", "saidaTarde"],
+    };
+
+    const availableActions = actions[type];
+    if (!availableActions) {
+      setErrorMessage("Ação inválida. Por favor, tente novamente.");
+      setTimeout(() => setErrorMessage(""), 5000);
+      return;
+    }
+
+    const nextAction = availableActions.find(
+      (action) => !timeEntries[action as keyof typeof timeEntries]
+    );
 
     if (!nextAction) {
       setErrorMessage(
-        `Não é possível registrar ${type} no momento. Tente novamente no próximo horário válido.`
+        `Todos os pontos de ${type} do dia já foram registrados.`
       );
+      setTimeout(() => setErrorMessage(""), 5000);
+      return;
+    }
+
+    if (!isWithinSchedule(nextAction)) {
+      const attemptedTime = serverTime.toLocaleTimeString("pt-BR"); // Obtém o horário atual formatado
+      setErrorMessage(`Horário inválido para ${type}. (${attemptedTime})`);
+      setTimeout(() => setErrorMessage(""), 5000);
       return;
     }
 
     try {
-      const newEntry = {
-        userId: userId,
-        date: today,
-        action: nextAction,
-        timestamp: Timestamp.fromDate(serverTime),
-      };
+      const userDocRef = doc(db, "timeLogs", userId); // Cria a referência ao documento com o ID do usuário
+      const docSnapshot = await getDoc(userDocRef);
 
-      await addDoc(collection(db, "timeLogs"), newEntry);
+      if (!docSnapshot.exists()) {
+        // Cria um novo documento para o usuário, se ainda não existir
+        await setDoc(userDocRef, {
+          userId,
+          userName,
+          date: today,
+          entries: {
+            [nextAction]: serverTime.toLocaleTimeString("pt-BR"),
+          },
+        });
+      } else {
+        // Atualiza o documento existente adicionando a nova entrada
+        await updateDoc(userDocRef, {
+          [`entries.${nextAction}`]: serverTime.toLocaleTimeString("pt-BR"),
+        });
+      }
+
       setMessage(
         `${type === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`
       );
-      setErrorMessage(""); // Limpa qualquer mensagem de erro anterior
+      setTimeout(() => setMessage(""), 5000);
 
+      // Atualiza os dados no estado
       setTimeEntries((prevEntries) => ({
         ...prevEntries,
-        [nextAction as keyof typeof timeEntries]:
-          serverTime.toLocaleTimeString("pt-BR"),
+        [nextAction]: serverTime.toLocaleTimeString("pt-BR"),
       }));
     } catch (error) {
-      console.error("Erro ao registrar o ponto:", error);
+      console.error("Erro ao registrar ponto:", error);
       setErrorMessage("Erro ao registrar o ponto.");
+      setTimeout(() => setErrorMessage(""), 5000);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/");
+    } catch (error) {
+      console.error("Erro ao sair:", error);
     }
   };
 
@@ -205,28 +222,30 @@ const TimeTrackingPage = () => {
             Bem-vindo, {userName}
           </p>
         )}
-        {serverTime && (
+        {serverTime ? (
           <p className="text-center text-gray-400 mb-4">
             {serverTime.toLocaleDateString("pt-BR")}{" "}
             {serverTime.toLocaleTimeString("pt-BR")}
           </p>
+        ) : (
+          <p className="text-center text-red-400">Carregando horário...</p>
         )}
         <div className="space-y-4 text-white">
           <div className="flex justify-between">
             <span>Entrada manhã:</span>
-            <span>{timeEntries.entradaManha || "08:00"}</span>
+            <span>{timeEntries.entradaManha || "--:--"}</span>
           </div>
           <div className="flex justify-between">
             <span>Saída manhã:</span>
-            <span>{timeEntries.saidaManha || "12:00"}</span>
+            <span>{timeEntries.saidaManha || "--:--"}</span>
           </div>
           <div className="flex justify-between">
             <span>Entrada tarde:</span>
-            <span>{timeEntries.entradaTarde || "13:00"}</span>
+            <span>{timeEntries.entradaTarde || "--:--"}</span>
           </div>
           <div className="flex justify-between">
             <span>Saída tarde:</span>
-            <span>{timeEntries.saidaTarde || "18:00"}</span>
+            <span>{timeEntries.saidaTarde || "--:--"}</span>
           </div>
         </div>
         <div className="mt-6 flex justify-between gap-4">

@@ -22,11 +22,11 @@ const LoginPage = () => {
       );
       const user = userCredential.user;
 
-      // Primeiro verifica na coleção `users`
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.isAdmin) {
+      // Verifica na coleção `employees`
+      const employeeDoc = await getDoc(doc(db, "employees", user.uid));
+      if (employeeDoc.exists()) {
+        const employeeData = employeeDoc.data();
+        if (employeeData.isAdmin) {
           navigate("/admin"); // Redireciona para a página do administrador
         } else {
           navigate("/time-tracking"); // Redireciona para a página de controle de ponto
@@ -34,14 +34,7 @@ const LoginPage = () => {
         return;
       }
 
-      // Caso não esteja em `users`, verifica na coleção `employees`
-      const employeeDoc = await getDoc(doc(db, "employees", user.uid));
-      if (employeeDoc.exists()) {
-        navigate("/time-tracking"); // Funcionários só acessam controle de ponto
-        return;
-      }
-
-      setError("Usuário não encontrado em nenhuma coleção.");
+      setError("Usuário não encontrado na coleção de funcionários.");
     } catch (error: any) {
       console.error("Erro ao fazer login:", error.message);
       setError("Credenciais inválidas. Tente novamente.");
@@ -70,6 +63,15 @@ const LoginPage = () => {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none"
           />
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={() => navigate("/redefinir-senha")}
+              className="text-blue-400 hover:text-blue-500 text-sm"
+            >
+              Esqueceu a senha?
+            </button>
+          </div>
           <button
             type="submit"
             className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"

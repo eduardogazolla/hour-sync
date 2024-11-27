@@ -10,6 +10,8 @@ import TimeTrackingPage from "./pages/TimeTrackingPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import EmployeeReport from "./pages/EmployeeReport";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -32,6 +34,9 @@ function AppRoutes() {
           )
         }
       />
+      <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
+      <Route path="/employee-report" element={<EmployeeReport />} />
+
 
       {/* Página do admin */}
       <Route

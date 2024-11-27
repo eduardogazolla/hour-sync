@@ -3,17 +3,10 @@ import { signOut } from "firebase/auth";
 import { useState, useEffect } from "react";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { Switch } from "@mui/material";
-import { useAuth } from "../contexts/AuthContext"; // Certifique-se de que o contexto está importado corretamente
-import {
-  Edit,
-  Add,
-  ExitToApp,
-  AccessAlarm,
-  Menu,
-  MenuOpen,
-} from "@mui/icons-material";
+import { useAuth } from "../contexts/AuthContext";
+import { Edit, Add, ExitToApp, Menu, MenuOpen } from "@mui/icons-material";
 import EmployeeFormModal from "./EmployeeFormModal";
-import EditEmployeeModal from "./EditEmployeeModal"; // Novo modal para edição
+import EditEmployeeModal from "./EditEmployeeModal";
 import { auth, db } from "../firebaseConfig";
 
 interface Employee {
@@ -21,52 +14,46 @@ interface Employee {
   name: string;
   cpf: string;
   email: string;
-  password: string;
-  status: string;
+  sector: string;
   role: string;
   birthDate: string;
   address: string;
+  status: string;
+  isAdmin: boolean;
 }
 
 const AdminDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [administrators, setAdministrators] = useState<Employee[]>([]);
+  const [collaborators, setCollaborators] = useState<Employee[]>([]);
   const [search, setSearch] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // Novo estado para modal de edição
-  const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null); // Dados do funcionário a ser editado
-  const [message, setMessage] = useState(""); // Mensagem de sucesso ou erro
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
+  const [message, setMessage] = useState("");
 
-  // Alternar menu lateral
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
-  // Abrir modal para adicionar funcionário
   const handleAddEmployeeClick = () => setIsModalOpen(true);
 
-  // Fechar modal de adicionar
   const handleCloseModal = () => setIsModalOpen(false);
 
-  // Atualizar lista após adicionar
   const handleEmployeeAdded = () => fetchEmployees();
 
-  // Abrir modal para editar funcionário
   const handleEditEmployeeClick = (employee: Employee) => {
     setEmployeeToEdit(employee);
     setIsEditModalOpen(true);
   };
 
-  // Fechar modal de edição
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setEmployeeToEdit(null);
   };
 
-  // Atualizar lista após edição
   const handleEmployeeUpdated = () => fetchEmployees();
 
-  // Buscar colaboradores do Firestore
   const fetchEmployees = async () => {
     const employeeList: Employee[] = [];
     const querySnapshot = await getDocs(collection(db, "employees"));
@@ -74,44 +61,25 @@ const AdminDashboard = () => {
       const data = doc.data() as Omit<Employee, "id">;
       employeeList.push({ id: doc.id, ...data });
     });
-    setEmployees(employeeList);
+
+    setAdministrators(employeeList.filter((employee) => employee.isAdmin));
+    setCollaborators(employeeList.filter((employee) => !employee.isAdmin));
   };
 
   useEffect(() => {
     fetchEmployees();
   }, []);
 
-  // Alternar status do colaborador
   const toggleStatus = async (employeeId: string, currentStatus: string) => {
     try {
       const employeeRef = doc(db, "employees", employeeId);
       const newStatus = currentStatus === "ativo" ? "inativo" : "ativo";
 
-      // Atualizar o status no Firestore
       await updateDoc(employeeRef, { status: newStatus });
 
-      // Atualizar o status no Firebase Authentication via API backend
-      const response = await fetch("http://localhost:5000/toggle-user-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid: employeeId, // O ID do usuário no Firebase Authentication
-          disabled: newStatus === "inativo", // Desabilitar se o status for "inativo"
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao atualizar status.");
-      }
-
-      const data = await response.json();
-      setMessage(data.message);
-
-      // Atualiza a lista de funcionários
+      setMessage(`Status atualizado com sucesso para ${newStatus}.`);
       fetchEmployees();
 
-      // Remove a mensagem após 5 segundos
       setTimeout(() => setMessage(""), 5000);
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
@@ -120,7 +88,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Deslogar o administrador
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -130,14 +97,17 @@ const AdminDashboard = () => {
     }
   };
 
-  if (!user || !user.isAdmin) {
-    navigate("/"); // Redireciona para o login se o usuário não for admin
-    return null;
-  }
+  const filterEmployees = (employees: Employee[]) =>
+    employees.filter(
+      (employee) =>
+        employee.name.toLowerCase().includes(search.toLowerCase()) ||
+        employee.email.toLowerCase().includes(search.toLowerCase()) ||
+        employee.role.toLowerCase().includes(search.toLowerCase()) ||
+        employee.sector.toLowerCase().includes(search.toLowerCase())
+    );
 
   return (
     <div className="flex min-h-screen bg-gray-900 text-white">
-      {/* Menu Lateral */}
       <div
         className={`${
           isMenuOpen ? "w-64" : "w-16"
@@ -163,13 +133,6 @@ const AdminDashboard = () => {
               <Add fontSize="large" />
               {isMenuOpen && <span className="ml-4">Adicionar</span>}
             </button>
-            <button
-              className="flex items-center text-gray-300 hover:text-white pl-4"
-              onClick={() => console.log("Registrar Ponto")}
-            >
-              <AccessAlarm fontSize="large" />
-              {isMenuOpen && <span className="ml-4">Bater Ponto</span>}
-            </button>
           </div>
         </div>
         <button
@@ -181,68 +144,140 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {/* Conteúdo Principal */}
       <div className="flex-1 p-8">
-        <h1 className="text-3xl font-semibold mb-6">Lista de colaboradores</h1>
+        <h1 className="text-3xl font-semibold mb-6">
+          Bem-vindo, {user?.displayName || "Administrador"}
+        </h1>
         {message && (
           <div className="mb-4 text-green-500 text-center">{message}</div>
         )}
-        <div className="flex justify-between mb-4">
+
+        <div className="mb-4">
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Pesquise por nome, e-mail, função ou setor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="p-2 rounded bg-gray-700 text-white focus:outline-none"
+            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
-          <div className="grid grid-cols-6 gap-4 p-2 font-semibold border-b border-gray-700">
-            <div>Nome</div>
-            <div>Email</div>
-            <div>Senha</div>
-            <div>Status</div>
-            <div>Função</div>
-            <div>Ações</div>
-          </div>
-          {employees
-            .filter((employee) =>
-              employee.name.toLowerCase().includes(search.toLowerCase())
-            )
-            .map((employee) => (
-              <div
-                key={employee.id}
-                className="grid grid-cols-6 gap-4 items-center p-2 border-b border-gray-700"
-              >
-                <div className="flex items-center space-x-2">
-                  <span className="rounded-full bg-green-500 w-8 h-8 flex items-center justify-center text-white">
-                    {employee.name[0].toUpperCase()}
-                  </span>
-                  <span>{employee.name}</span>
-                </div>
-                <div>{employee.email}</div>
-                <div>{employee.password}</div>
-                <div>{employee.status}</div>
-                <div>{employee.role}</div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleEditEmployeeClick(employee)}
-                    className="text-blue-500 hover:text-blue-700"
+
+        <h2 className="text-2xl font-semibold mb-4">Administradores</h2>
+        <div className="bg-gray-800 p-4 rounded-lg shadow-lg mb-8 overflow-x-auto">
+          <table className="table-auto w-full text-left text-white">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Setor</th>
+                <th>Função</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filterEmployees(administrators).map((admin) => (
+                <tr
+                  key={admin.id}
+                  className="border-b border-gray-700 hover:bg-gray-700 transition"
+                >
+                  <td
+                    onClick={() =>
+                      navigate("/employee-report", {
+                        state: { employeeId: admin.id, employeeName: admin.name },
+                      })
+                    }
+                    className="py-3 flex items-center space-x-2 cursor-pointer"
                   >
-                    <Edit fontSize="small" />
-                  </button>
-                  <Switch
-                    checked={employee.status === "ativo"}
-                    color="primary"
-                    onChange={() => toggleStatus(employee.id, employee.status)}
-                  />
-                </div>
-              </div>
-            ))}
+                    <div className="bg-blue-500 text-white w-8 h-8 flex items-center justify-center rounded-full">
+                      {admin.name[0].toUpperCase()}
+                    </div>
+                    <span>{admin.name}</span>
+                  </td>
+                  <td>{admin.email}</td>
+                  <td>{admin.sector}</td>
+                  <td>{admin.role}</td>
+                  <td>{admin.status}</td>
+                  <td>
+                    <button
+                      onClick={() => handleEditEmployeeClick(admin)}
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      <Edit fontSize="small" />
+                    </button>
+                    <Switch
+                      checked={admin.status === "ativo"}
+                      color="primary"
+                      onChange={() => toggleStatus(admin.id, admin.status)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2 className="text-2xl font-semibold mb-4">Colaboradores</h2>
+        <div className="bg-gray-800 p-4 rounded-lg shadow-lg overflow-x-auto">
+          <table className="table-auto w-full text-left text-white">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Setor</th>
+                <th>Função</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filterEmployees(collaborators).map((collaborator) => (
+                <tr
+                  key={collaborator.id}
+                  className="border-b border-gray-700 hover:bg-gray-700 transition"
+                >
+                  <td
+                    onClick={() =>
+                      navigate("/employee-report", {
+                        state: {
+                          employeeId: collaborator.id,
+                          employeeName: collaborator.name,
+                        },
+                      })
+                    }
+                    className="py-3 flex items-center space-x-2 cursor-pointer"
+                  >
+                    <div className="bg-green-500 text-white w-8 h-8 flex items-center justify-center rounded-full">
+                      {collaborator.name[0].toUpperCase()}
+                    </div>
+                    <span>{collaborator.name}</span>
+                  </td>
+                  <td>{collaborator.email}</td>
+                  <td>{collaborator.sector}</td>
+                  <td>{collaborator.role}</td>
+                  <td>{collaborator.status}</td>
+                  <td>
+                    <button
+                      onClick={() => handleEditEmployeeClick(collaborator)}
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      <Edit fontSize="small" />
+                    </button>
+                    <Switch
+                      checked={collaborator.status === "ativo"}
+                      color="primary"
+                      onChange={() =>
+                        toggleStatus(collaborator.id, collaborator.status)
+                      }
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Modais */}
       {isModalOpen && (
         <EmployeeFormModal
           onClose={handleCloseModal}

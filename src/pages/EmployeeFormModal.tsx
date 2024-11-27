@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { auth } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
+import { doc, setDoc } from "firebase/firestore";
 
 const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
   const [formData, setFormData] = useState({
@@ -11,35 +12,34 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
     birthDate: "",
     address: "",
     role: "",
+    sector: "",
     isAdmin: false,
   });
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [loading, setLoading] = useState(false); // Estado para o loading
+  const [loading, setLoading] = useState(false);
 
   const formatCPF = (value: string) => {
     return value
-      .replace(/\D/g, "") // Remove todos os caracteres que não são dígitos
-      .replace(/(\d{3})(\d)/, "$1.$2") // Adiciona o primeiro ponto
-      .replace(/(\d{3})(\d)/, "$1.$2") // Adiciona o segundo ponto
-      .replace(/(\d{3})(\d{1,2})$/, "$1-$2"); // Adiciona o traço
+      .replace(/\D/g, "")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
   };
 
   const formatDate = (value: string) => {
     return value
-      .replace(/\D/g, "") // Remove caracteres não numéricos
-      .replace(/(\d{2})(\d)/, "$1/$2") // Adiciona a barra após o dia
-      .replace(/(\d{2})(\d)/, "$1/$2"); // Adiciona a barra após o mês
+      .replace(/\D/g, "")
+      .replace(/(\d{2})(\d)/, "$1/$2")
+      .replace(/(\d{2})(\d)/, "$1/$2");
   };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value, type, checked } = e.target as HTMLInputElement;
-
+    const { name, value, type } = e.target;
+    const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
     let formattedValue = value;
 
-    // Aplica a formatação dependendo do campo
     if (name === "cpf") {
       formattedValue = formatCPF(value);
     } else if (name === "birthDate") {
@@ -55,56 +55,33 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setSuccessMessage("");
 
     if (formData.password !== formData.confirmPassword) {
       setError("As senhas não coincidem!");
       return;
     }
 
-    setLoading(true); // Ativar o loading
+    setLoading(true);
 
     try {
-      const currentUser = auth.currentUser;
-      const idToken = await currentUser?.getIdToken();
+      const newEmployeeId = auth.currentUser?.uid || crypto.randomUUID();
 
-      const response = await fetch("http://localhost:5000/create-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          displayName: formData.name,
-          cpf: formData.cpf,
-          birthDate: formData.birthDate,
-          address: formData.address,
-          role: formData.role,
-          isAdmin: formData.isAdmin,
-        }),
+      const employeeRef = doc(db, "employees", newEmployeeId);
+      await setDoc(employeeRef, {
+        uid: newEmployeeId,
+        email: formData.email,
+        name: formData.name,
+        cpf: formData.cpf,
+        birthDate: formData.birthDate,
+        address: formData.address,
+        role: formData.role,
+        sector: formData.sector,
+        isAdmin: formData.isAdmin,
+        status: "ativo",
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao criar usuário");
-      }
-
-      // Sucesso na criação do usuário
-      setSuccessMessage("Funcionário cadastrado com sucesso!");
-      setFormData({
-        name: "",
-        cpf: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-        birthDate: "",
-        address: "",
-        role: "",
-        isAdmin: false,
-      });
       onEmployeeAdded();
+      onClose();
     } catch (error: any) {
       console.error("Erro ao cadastrar funcionário:", error.message);
       setError("Erro ao cadastrar funcionário. Tente novamente.");
@@ -116,17 +93,8 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full text-white">
-        <h2 className="text-2xl font-semibold mb-4">
-          Cadastrar Novo Funcionário
-        </h2>
-        {error && (
-          <div className="bg-red-600 p-2 rounded mb-4 text-center">{error}</div>
-        )}
-        {successMessage && (
-          <div className="bg-green-600 p-2 rounded mb-4 text-center">
-            {successMessage}
-          </div>
-        )}
+        <h2 className="text-2xl font-semibold mb-4">Cadastrar Novo Funcionário</h2>
+        {error && <div className="bg-red-600 p-2 rounded mb-4 text-center">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             name="name"
@@ -188,25 +156,37 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
             required
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <select
+          <input
             name="role"
             value={formData.role}
             onChange={handleInputChange}
+            placeholder="Função"
             required
             className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Selecione o Cargo</option>
-            <option value="Estagiário">Estagiário</option>
-            <option value="Administrador">Administrador</option>
-            <option value="Funcionário">Funcionário</option>
-          </select>
+          />
+          <input
+            name="sector"
+            value={formData.sector}
+            onChange={handleInputChange}
+            placeholder="Setor"
+            required
+            className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              name="isAdmin"
+              checked={formData.isAdmin}
+              onChange={handleInputChange}
+              className="form-checkbox h-5 w-5 text-blue-600"
+            />
+            <label htmlFor="isAdmin">Administrador</label>
+          </div>
           <button
             type="submit"
             disabled={loading}
             className={`w-full py-2 rounded font-bold transition ${
-              loading
-                ? "bg-gray-600 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
+              loading ? "bg-gray-600 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
             }`}
           >
             {loading ? "Cadastrando..." : "Cadastrar Novo Funcionário"}
