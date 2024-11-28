@@ -94,49 +94,49 @@ const EmployeeReport = () => {
   const handleExportPDF = (employeeDetails: any, timeLogs: TimeLog[]) => {
     const doc = new jsPDF();
     // Cabeçalho do PDF
-  doc.setFontSize(18);
-  doc.text("Relatório de Pontos", 105, 10, { align: "center" });
+    doc.setFontSize(18);
+    doc.text("Relatório de Pontos", 105, 10, { align: "center" });
 
-  // Informações do funcionário
-  const userInfo = [
-    `Nome: ${employeeDetails.name || "Não informado"}`,
-    `Email: ${employeeDetails.email || "Não informado"}`,
-    `Setor: ${employeeDetails.sector || "Não informado"}`,
-    `Função: ${employeeDetails.role || "Não informado"}`,
-    `Status: ${employeeDetails.status || "Não informado"}`,
-  ];
+    // Informações do funcionário
+    const userInfo = [
+      `Nome: ${employeeDetails.name || "Não informado"}`,
+      `Email: ${employeeDetails.email || "Não informado"}`,
+      `Setor: ${employeeDetails.sector || "Não informado"}`,
+      `Função: ${employeeDetails.role || "Não informado"}`,
+      `Status: ${employeeDetails.status || "Não informado"}`,
+    ];
 
-  doc.setFontSize(12);
-  userInfo.forEach((info, index) => {
-    doc.text(info, 10, 20 + index * 6);
-  });
+    doc.setFontSize(12);
+    userInfo.forEach((info, index) => {
+      doc.text(info, 10, 20 + index * 6);
+    });
 
     // Configuração da tabela
-  const tableColumns = [
-    "Data",
-    "Entrada Manhã",
-    "Saída Manhã",
-    "Entrada Tarde",
-    "Saída Tarde",
-  ];
-  const tableRows = timeLogs.map((log) => [
-    log.date,
-    log.entries.entradaManha || "--:--",
-    log.entries.saidaManha || "--:--",
-    log.entries.entradaTarde || "--:--",
-    log.entries.saidaTarde || "--:--",
-  ]);
- // Renderiza a tabela no PDF
-  doc.autoTable({
-    head: [tableColumns],
-    body: tableRows,
-    startY: 60,
-    margin: { top: 10 },
-  });
+    const tableColumns = [
+      "Data",
+      "Entrada Manhã",
+      "Saída Manhã",
+      "Entrada Tarde",
+      "Saída Tarde",
+    ];
+    const tableRows = timeLogs.map((log) => [
+      log.date,
+      log.entries.entradaManha || "--:--",
+      log.entries.saidaManha || "--:--",
+      log.entries.entradaTarde || "--:--",
+      log.entries.saidaTarde || "--:--",
+    ]);
+    // Renderiza a tabela no PDF
+    doc.autoTable({
+      head: [tableColumns],
+      body: tableRows,
+      startY: 60,
+      margin: { top: 10 },
+    });
 
-     // Salva o PDF
-  doc.save(`Relatorio_${employeeDetails.name || "Usuario"}.pdf`);
-};
+    // Salva o PDF
+    doc.save(`Relatorio_${employeeDetails.name || "Usuario"}.pdf`);
+  };
 
   const filteredLogs = timeLogs.filter((log) => {
     const logDate = new Date(log.date);
@@ -163,11 +163,12 @@ const EmployeeReport = () => {
         Relatório de Pontos {employeeName}
       </h1>
 
+      {/* Detalhes do funcionário */}
       {employeeDetails && (
         <div className="bg-gray-800 p-4 rounded-lg shadow-md mb-6">
           <p><strong>Nome:</strong> {employeeDetails.name}</p>
           <p><strong>Email:</strong> {employeeDetails.email}</p>
-          <p><strong>Setor:</strong> {employeeDetails.sector || "Não informado"}</p>
+          <p><strong>Setor:</strong> {employeeDetails.setor || "Não informado"}</p>
           <p><strong>Função:</strong> {employeeDetails.role || "Não informado"}</p>
           <p><strong>Status:</strong> {employeeDetails.status || "Não informado"}</p>
         </div>
@@ -246,12 +247,10 @@ const EditLogModal = ({
   onSubmit: (updatedLog: TimeLog) => void;
 }) => {
   const [entries, setEntries] = useState(log.entries);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEntries((prevEntries) => ({ ...prevEntries, [name]: value }));
   };
-
   const handleSubmit = () => {
     onSubmit({ ...log, entries });
   };
@@ -261,7 +260,7 @@ const EditLogModal = ({
       <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full text-white">
         <h2 className="text-2xl font-bold mb-4">Editar Horários</h2>
         <form className="space-y-4">
-          {["entradaManha", "saidaManha", "entradaTarde", "saidaTarde"].map((field) => (
+        {["entradaManha", "saidaManha", "entradaTarde", "saidaTarde"].map((field) => (
             <div key={field}>
               <label>{field.replace(/([A-Z])/g, " $1").toUpperCase()}</label>
               <input

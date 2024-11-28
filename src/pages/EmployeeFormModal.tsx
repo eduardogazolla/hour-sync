@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { auth, db } from "../firebaseConfig";
-import { doc, setDoc } from "firebase/firestore";
 
 const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
   const [formData, setFormData] = useState({
     name: "",
     cpf: "",
+    uid: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -52,6 +51,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
     });
   };
 
+  // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -64,24 +64,35 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
     setLoading(true);
 
     try {
-      const newEmployeeId = auth.currentUser?.uid || crypto.randomUUID();
-
-      const employeeRef = doc(db, "employees", newEmployeeId);
-      await setDoc(employeeRef, {
-        uid: newEmployeeId,
-        email: formData.email,
-        name: formData.name,
-        cpf: formData.cpf,
-        birthDate: formData.birthDate,
-        address: formData.address,
-        role: formData.role,
-        sector: formData.sector,
-        isAdmin: formData.isAdmin,
-        status: "ativo",
+      // Envia para o backend para criação de usuário
+      const response = await fetch("http://localhost:5000/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          uid: formData.uid,
+          password: formData.password,
+          displayName: formData.name,
+          cpf: formData.cpf,
+          birthDate: formData.birthDate,
+          address: formData.address,
+          role: formData.role,
+          sector: formData.sector,
+          isAdmin: formData.isAdmin,
+        }),
       });
 
-      onEmployeeAdded();
-      onClose();
+      const data = await response.json();
+
+      if (response.status === 201) {
+        // Depois de criar o usuário, chama o callback para atualizar a lista de funcionários
+        onEmployeeAdded();
+        onClose(); // Fecha o modal
+      } else {
+        setError(data.error || "Erro ao criar o usuário.");
+      }
     } catch (error: any) {
       console.error("Erro ao cadastrar funcionário:", error.message);
       setError("Erro ao cadastrar funcionário. Tente novamente.");
@@ -230,7 +241,6 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
       </div>
     </div>
   );
-  
 };
 
 export default EmployeeFormModal;

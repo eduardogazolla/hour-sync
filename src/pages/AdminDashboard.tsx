@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { useState, useEffect } from "react";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, getDoc, updateDoc, doc } from "firebase/firestore";
 import { Switch } from "@mui/material";
 import { useAuth } from "../contexts/AuthContext";
 import { Edit, Add, ExitToApp, Menu, MenuOpen, AccessTime } from "@mui/icons-material";
@@ -77,6 +77,22 @@ const AdminDashboard = () => {
 
       await updateDoc(employeeRef, { status: newStatus });
 
+      // Atualizar o status no Firebase Authentication via API backend
+      const response = await fetch("http://localhost:5000/toggle-user-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: employeeId, // O ID do usuário no Firebase Authentication
+          disabled: newStatus === "inativo", // Desabilitar se o status for "inativo"
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao atualizar status.");
+      }
+      const data = await response.json();
+      setMessage(data.message);
+
       setMessage(`Status atualizado com sucesso para ${newStatus}.`);
       fetchEmployees();
 
@@ -97,11 +113,30 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleGoToTimeTracking = () => {
-    navigate("/time-tracking", {
-      state: { userId: user?.uid, userName: user?.displayName },
-    });
+  const handleGoToTimeTracking = async () => {
+    try {
+      if (user?.uid) {
+        // Obtenha o documento do usuário logado no Firestore
+        const userDocRef = doc(db, "employees", user.uid);
+        const userDocSnapshot = await getDoc(userDocRef);
+  
+        // Verifique se o documento foi encontrado
+        if (userDocSnapshot.exists()) {
+          const userData = userDocSnapshot.data();
+          
+          // Redirecione para a página de time-tracking, passando o nome atualizado
+          navigate("/time-tracking", {
+            state: { userId: user.uid, userName: userData?.name || user.displayName },
+          });
+        } else {
+          console.error("Usuário não encontrado no Firestore.");
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados do usuário:", error);
+    }
   };
+  
 
   const filterEmployees = (employees: Employee[]) =>
     employees.filter(

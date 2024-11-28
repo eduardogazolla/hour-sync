@@ -53,8 +53,6 @@ const createDailyLogs = async () => {
 // Agendar a verificação para rodar todo dia à meia-noite
 schedule.scheduleJob("0 0 * * *", createDailyLogs);
 
-console.log("Agendamento configurado para criar registros diários.");
-
 // Cria um novo usuário e adiciona no Firestore
 app.post("/create-user", async (req, res) => {
   const {
@@ -66,6 +64,7 @@ app.post("/create-user", async (req, res) => {
     address,
     role,
     isAdmin,
+    sector,
   } = req.body;
 
   try {
@@ -87,6 +86,7 @@ app.post("/create-user", async (req, res) => {
       address,
       role,
       isAdmin,
+      sector,
       status: "ativo",
     });
 
@@ -97,6 +97,36 @@ app.post("/create-user", async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
+
+// Atualizar usuário no Firebase Authentication
+app.post("/update-user", async (req, res) => {
+  const { uid, email, displayName } = req.body;
+
+  try {
+    // Verificar se o usuário existe
+    const userRecord = await admin.auth().getUser(uid);
+
+    // Atualizar o usuário
+    const updatedUser = await admin.auth().updateUser(uid, {
+      email,
+      displayName,
+    });
+
+    // Enviar a resposta com sucesso
+    return res.status(200).json({
+      message: "Usuário atualizado com sucesso.",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar o usuário:", error);
+
+    // Responder com erro em formato JSON
+    return res.status(500).json({
+      error: error.message || "Erro desconhecido ao atualizar o usuário.",
+    });
+  }
+});
+
 
 app.post("/register-point", async (req, res) => {
   const { userId, timestamp, type } = req.body;

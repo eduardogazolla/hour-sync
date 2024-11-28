@@ -28,6 +28,8 @@ const EditEmployeeModal = ({
 }: EditEmployeeModalProps) => {
   const [formData, setFormData] = useState<Employee | null>(employee);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
 
   useEffect(() => {
     if (employee) {
@@ -35,11 +37,35 @@ const EditEmployeeModal = ({
     }
   }, [employee]);
 
+  // Formatar CPF
+  const formatCPF = (value: string) => {
+    return value
+      .replace(/\D/g, "") // Remove todos os caracteres não numéricos
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  };
+
+  // Formatar Data de Nascimento
+  const formatDate = (value: string) => {
+    return value
+      .replace(/\D/g, "")
+      .replace(/(\d{2})(\d)/, "$1/$2")
+      .replace(/(\d{2})(\d)/, "$1/$2");
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
-    const newValue = type === "checkbox" ? checked : value;
+    let newValue = type === "checkbox" ? checked : value;
+
+    // Formatação específica para CPF e Data de Nascimento
+    if (name === "cpf") {
+      newValue = formatCPF(value);
+    } else if (name === "birthDate") {
+      newValue = formatDate(value);
+    }
 
     if (formData) {
       setFormData({ ...formData, [name]: newValue });
@@ -48,22 +74,63 @@ const EditEmployeeModal = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+  
     if (formData) {
       setLoading(true);
+      setError(""); // Limpar qualquer erro anterior
+  
       try {
+        // Envia os dados de atualização para o backend
+        const response = await fetch('http://localhost:5000/update-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: formData.id,  // UID do usuário para identificar qual usuário será alterado
+            email: formData.email,  // Novo email
+            displayName: formData.name,  // Nome atualizado
+          }),
+        });
+  
+        // Verifica se a resposta está no formato correto
+        const responseBody = await response.text(); // Lê a resposta como texto
+        console.log('Resposta do servidor:', responseBody);  // Log da resposta em texto
+  
+        // Tenta converter a resposta em JSON
+        let data;
+        try {
+          data = JSON.parse(responseBody);
+          console.log('Resposta JSON:', data);
+        } catch (error) {
+          console.error('Erro ao parsear JSON:', error);
+          setError('Erro ao processar a resposta do servidor.');
+          return;
+        }
+  
+        if (response.status !== 200) {
+          setError(data?.error || 'Erro ao atualizar o usuário');
+          return;
+        }
+
+        // Atualizar os dados do funcionário no Firestore
         const employeeRef = doc(db, "employees", formData.id);
         await updateDoc(employeeRef, { ...formData });
-
+  
+        // Se a resposta for bem-sucedida, chama as funções de atualização
         onEmployeeUpdated();
         onClose();
       } catch (error) {
-        console.error("Erro ao atualizar funcionário:", error);
+        console.error("Erro ao atualizar o funcionário:", error);
+        setError("Erro ao atualizar o funcionário. Tente novamente.");
       } finally {
         setLoading(false);
       }
     }
   };
+  
+  
+  
 
   if (!formData) {
     return null;
@@ -183,7 +250,6 @@ const EditEmployeeModal = ({
       </div>
     </div>
   );
-  
 };
 
 export default EditEmployeeModal;
