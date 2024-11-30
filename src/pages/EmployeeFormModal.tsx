@@ -44,7 +44,8 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
-    const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
+    const checked =
+      type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
 
     if (name.startsWith("address.")) {
       const addressField = name.split(".")[1];
@@ -74,34 +75,34 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-  
+
     // Validação das senhas
     if (formData.password !== formData.confirmPassword) {
       setError("As senhas não coincidem!");
       return;
     }
-  
+
     // Validação da data de nascimento
     const today = new Date();
     const birthDate = new Date(
       formData.birthDate.split("/").reverse().join("-")
     ); // Converte para o formato YYYY-MM-DD
-  
+
     const age = today.getFullYear() - birthDate.getFullYear();
     const isValidDate =
       birthDate < today && // Data de nascimento no passado
-      age >= 16 && // Pelo menos 16 ano de idade
+      age >= 16 && // Pelo menos 16 anos de idade
       age <= 75; // No máximo 75 anos
-  
+
     if (!isValidDate) {
       setError(
-        "A data de nascimento deve ser válida e indicar pelo menos 1 ano de idade."
+        "A data de nascimento deve ser válida e indicar pelo menos 16 anos de idade."
       );
       return;
     }
-  
+
     setLoading(true);
-  
+
     try {
       // Envia para o backend para criação de usuário
       const response = await fetch("http://localhost:5000/create-user", {
@@ -111,20 +112,19 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
         },
         body: JSON.stringify({
           email: formData.email,
-          uid: formData.uid,
           password: formData.password,
           displayName: formData.name,
           cpf: formData.cpf,
           birthDate: formData.birthDate,
           address: formData.address,
           role: formData.role,
-          sector: formData.sector,
           isAdmin: formData.isAdmin,
+          sector: formData.sector,
         }),
       });
-  
+
       const data = await response.json();
-  
+
       if (response.status === 201) {
         // Depois de criar o usuário, chama o callback para atualizar a lista de funcionários
         onEmployeeAdded();
@@ -139,13 +139,14 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
       setLoading(false);
     }
   };
-  
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-5xl w-full text-white">
         <h2 className="text-2xl font-semibold mb-4">Cadastrar Novo Funcionário</h2>
-        {error && <div className="bg-red-600 p-2 rounded mb-4 text-center">{error}</div>}
+        {error && (
+          <div className="bg-red-600 p-2 rounded mb-4 text-center">{error}</div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Coluna 1 */}
@@ -189,32 +190,37 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-  
-            {/* Coluna 2 */}
+          </div>
+
+          {/* Campos restantes... */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex flex-col">
               <label htmlFor="password" className="text-m text-gray-400 mb-1">
                 Senha <span className="text-red-500">*</span>
               </label>
               <input
                 name="password"
-                type="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                placeholder="••••••"
+                placeholder="********"
+                type="password"
                 required
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="confirmPassword" className="text-m text-gray-400 mb-1">
+              <label
+                htmlFor="confirmPassword"
+                className="text-m text-gray-400 mb-1"
+              >
                 Confirmar Senha <span className="text-red-500">*</span>
               </label>
               <input
                 name="confirmPassword"
-                type="password"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                placeholder="••••••"
+                type="password"
+                placeholder="********"
                 required
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -233,14 +239,14 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-  
+
             {/* Coluna 3 */}
             <div className="flex flex-col">
               <label htmlFor="address" className="text-m text-gray-400 mb-1">
                 Rua <span className="text-red-500">*</span>
               </label>
               <input
-                name="address"
+                name="address.street"
                 value={formData.address.street}
                 onChange={handleInputChange}
                 placeholder="Av. Brasil"
@@ -253,7 +259,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 Número <span className="text-red-500">*</span>
               </label>
               <input
-                name="number"
+                name="address.number"
                 value={formData.address.number}
                 onChange={handleInputChange}
                 placeholder="1234"
@@ -266,8 +272,8 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 Complemento
               </label>
               <input
-                name="complement"
-                value={formData.address.complement}
+                name="address.complement"
+                value={formData.address.complement || ""}
                 onChange={handleInputChange}
                 placeholder="Apto 101"
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -278,7 +284,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 Bairro <span className="text-red-500">*</span>
               </label>
               <input
-                name="bairro"
+                name="address.neighborhood"
                 value={formData.address.neighborhood}
                 onChange={handleInputChange}
                 placeholder="Centro"
@@ -291,7 +297,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 Cidade <span className="text-red-500">*</span>
               </label>
               <input
-                name="city"
+                name="address.city"
                 value={formData.address.city}
                 onChange={handleInputChange}
                 placeholder="São Paulo"
@@ -304,7 +310,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 Estado <span className="text-red-500">*</span>
               </label>
               <input
-                name="state"
+                name="address.state"
                 value={formData.address.state}
                 onChange={handleInputChange}
                 placeholder="SP"
@@ -317,7 +323,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 CEP <span className="text-red-500">*</span>
               </label>
               <input
-                name="cep"
+                name="address.zipCode"
                 value={formData.address.zipCode}
                 onChange={handleInputChange}
                 placeholder="12345-678"
@@ -325,9 +331,34 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            <div className="flex flex-col">
+              <label htmlFor="sector" className="text-m text-gray-400 mb-1">
+                Setor <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="sector"
+                value={formData.sector}
+                onChange={handleInputChange}
+                placeholder="Administração"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="role" className="text-m text-gray-400 mb-1">
+                Função <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                placeholder="Gerente"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
-  
-          {/* Campo adicional e botões */}
+
           <div className="flex items-center space-x-2 mt-4">
             <input
               type="checkbox"
@@ -342,7 +373,9 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
             type="submit"
             disabled={loading}
             className={`w-full py-2 rounded font-bold transition ${
-              loading ? "bg-gray-600 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+              loading
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700"
             }`}
           >
             {loading ? "Cadastrando..." : "Cadastrar Novo Funcionário"}

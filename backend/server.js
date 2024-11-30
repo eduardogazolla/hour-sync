@@ -58,7 +58,7 @@ app.post("/create-user", async (req, res) => {
   const {
     email,
     password,
-    displayName,
+    displayName,  // nome do usuário
     cpf,
     birthDate,
     address,
@@ -67,12 +67,30 @@ app.post("/create-user", async (req, res) => {
     sector,
   } = req.body;
 
+  // Validação dos dados
+  if (!email || !password || !displayName || !cpf || !birthDate) {
+    return res.status(400).send({ error: "Todos os campos obrigatórios devem ser preenchidos." });
+  }
+
+  // Verifique se o email já está em uso
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    if (userRecord) {
+      return res.status(400).send({ error: "O email já está em uso." });
+    }
+  } catch (error) {
+    // Se o erro for "user not found", significa que o email não está em uso, o que é esperado
+    if (error.code !== "auth/user-not-found") {
+      return res.status(500).send({ error: "Erro ao verificar o email." });
+    }
+  }
+
   try {
     // Cria o usuário no Firebase Authentication
     const userRecord = await admin.auth().createUser({
       email,
       password,
-      displayName,
+      displayName,  // displayName será o "name" do funcionário
     });
 
     // Adiciona o usuário na coleção "employees" no Firestore
@@ -83,20 +101,20 @@ app.post("/create-user", async (req, res) => {
       email,
       cpf,
       birthDate,
-      address,
+      address: address || {},  // Certifique-se de que o address não seja undefined
       role,
-      isAdmin,
-      sector,
-      status: "ativo",
+      isAdmin: isAdmin || false, // Valor padrão para isAdmin
+      sector: sector || "",  // Se não fornecido, deixe como string vazia
+      status: "ativo",  // Status fixo como "ativo"
     });
 
-    res
-      .status(201)
-      .send({ message: "Usuário criado com sucesso", user: userRecord });
+    res.status(201).send({ message: "Usuário criado com sucesso", user: userRecord });
   } catch (error) {
+    console.error("Erro ao criar o usuário:", error.message);
     res.status(500).send({ error: error.message });
   }
 });
+
 
 // Atualizar usuário no Firebase Authentication
 app.post("/update-user", async (req, res) => {

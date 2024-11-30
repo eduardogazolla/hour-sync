@@ -90,7 +90,10 @@ const EditEmployeeModal = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData) return;
+    if (!formData) {
+      setError("Dados inválidos. Por favor, revise o formulário.");
+      return;
+    }
 
     const today = new Date();
     const birthDate = new Date(
@@ -112,7 +115,12 @@ const EditEmployeeModal = ({
     try {
       const employeeRef = doc(db, "employees", formData.id);
       await updateDoc(employeeRef, {
-        ...formData,
+        name: formData.name,
+        cpf: formData.cpf,
+        email: formData.email,
+        role: formData.role,
+        sector: formData.sector,
+        birthDate: formData.birthDate,
         address: {
           street: formData.address.street,
           number: formData.address.number,
@@ -122,6 +130,8 @@ const EditEmployeeModal = ({
           state: formData.address.state,
           zipCode: formData.address.zipCode,
         },
+        isAdmin: formData.isAdmin,
+        status: formData.status,
       });
 
       onEmployeeUpdated();
@@ -129,12 +139,10 @@ const EditEmployeeModal = ({
     } catch (error) {
       console.error("Erro ao atualizar funcionário:", error);
       setError("Erro ao atualizar funcionário. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
   };
-
-  if (!formData) {
-    return null;
-  }
 
   const isFormValid = () => {
     const requiredFields = [
@@ -168,7 +176,7 @@ const EditEmployeeModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-3xl w-full text-white">
-        <h2 className="text-2xl font-semibold mb-4">Editar {formData.name}</h2>
+        <h2 className="text-2xl font-semibold mb-4">Editar {formData?.name}</h2>
         {loading && (
           <p className="mb-4 text-center text-blue-400">Salvando alterações...</p>
         )}
@@ -180,10 +188,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="name"
-                value={formData.name}
+                value={formData?.name}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -192,11 +200,11 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="cpf"
-                value={formData.cpf}
+                value={formData?.cpf}
                 onChange={handleInputChange}
                 maxLength={14}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -205,10 +213,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="email"
-                value={formData.email}
+                value={formData?.email}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -217,10 +225,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="birthDate"
-                value={formData.birthDate}
+                value={formData?.birthDate}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -229,10 +237,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="address.street"
-                value={formData.address.street}
+                value={formData?.address.street}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -241,10 +249,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="address.number"
-                value={formData.address.number}
+                value={formData?.address.number}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -252,8 +260,8 @@ const EditEmployeeModal = ({
                 Complemento
               </label>
               <input
-                name="complement"
-                value={formData.address.complement}
+                name="address.complement"
+                value={formData?.address.complement || ""}
                 onChange={handleInputChange}
                 placeholder="Apto 101"
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -265,10 +273,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="address.neighborhood"
-                value={formData.address.neighborhood}
+                value={formData?.address.neighborhood}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -277,10 +285,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="address.city"
-                value={formData.address.city}
+                value={formData?.address.city}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -289,10 +297,10 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="address.state"
-                value={formData.address.state}
+                value={formData?.address.state}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
@@ -301,10 +309,36 @@ const EditEmployeeModal = ({
               </label>
               <input
                 name="address.zipCode"
-                value={formData.address.zipCode}
+                value={formData?.address.zipCode}
                 onChange={handleInputChange}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-m text-gray-400 mb-1">
+                Setor <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="sector"
+                value={formData?.sector}
+                onChange={handleInputChange}
+                placeholder="Administração"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-m text-gray-400 mb-1">
+                Função <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="role"
+                value={formData?.role}
+                onChange={handleInputChange}
+                placeholder="Gerente"
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -312,7 +346,7 @@ const EditEmployeeModal = ({
             <input
               type="checkbox"
               name="isAdmin"
-              checked={formData.isAdmin}
+              checked={formData?.isAdmin}
               onChange={handleInputChange}
               className="form-checkbox h-5 w-5 text-blue-500"
             />

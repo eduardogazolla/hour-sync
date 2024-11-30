@@ -57,8 +57,8 @@ const TimeTrackingPage = () => {
       let serverTime = new Date(data.dateTime);
   
       if (useSimulation) {
-        const simulatedDate = "2024-11-30"; // Ajuste a data simulada
-        const simulatedTime = "17:00"; // Ajuste o horário simulado (HH:mm)
+        const simulatedDate = "2024-11-29"; // Ajuste a data simulada
+        const simulatedTime = "13:00"; // Ajuste o horário simulado (HH:mm)
   
         const [year, month, day] = simulatedDate.split("-").map(Number);
         const [hour, minute] = simulatedTime.split(":").map(Number);
