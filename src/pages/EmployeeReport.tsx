@@ -5,6 +5,7 @@ import { db } from "../firebaseConfig";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
+
 interface Entry {
   entradaManha: string;
   entradaTarde: string;
@@ -26,7 +27,10 @@ const EmployeeReport = () => {
 
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}`;
+  });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [logToEdit, setLogToEdit] = useState<TimeLog | null>(null);
   const [employeeDetails, setEmployeeDetails] = useState<any>(null);
@@ -43,6 +47,17 @@ const EmployeeReport = () => {
     } catch (error) {
       console.error("Erro ao buscar detalhes do funcionário:", error);
     }
+  };
+
+  const generateDaysOfMonth = (month: string): string[] => {
+    if (!month) return [];
+    const [year, monthIndex] = month.split("-").map(Number);
+    const daysInMonth = new Date(year, monthIndex, 0).getDate(); // Número de dias no mês
+    const days = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(`${year}-${monthIndex.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`);
+    }
+    return days;
   };
 
   const fetchTimeLogs = async () => {
@@ -91,26 +106,86 @@ const EmployeeReport = () => {
     }
   };
 
-  const handleExportPDF = (employeeDetails: any, timeLogs: TimeLog[]) => {
+  const daysOfMonth = generateDaysOfMonth(selectedMonth);
+
+  const allLogs = daysOfMonth.map((day) => {
+    const log = timeLogs.find((log) => log.date === day);
+    const dateObj = new Date(day);
+    const dayOfWeek = (dateObj.getDay() + 1) % 7;
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const weekendLabel = dayOfWeek === 0 ? "Domingo" : dayOfWeek === 6 ? "Sábado" : "";
+  
+    return {
+      id: log?.id || "",
+      date: day,
+      entries: isWeekend
+        ? { entradaManha: weekendLabel, saidaManha: weekendLabel, entradaTarde: weekendLabel, saidaTarde: weekendLabel }
+        : log?.entries || { entradaManha: "--:--", saidaManha: "--:--", entradaTarde: "--:--", saidaTarde: "--:--" },
+    };
+  });
+  
+  const calculateDailyHours = (entries: Entry) => {
+    const parseTime = (time: string) => {
+      const [hours, minutes, seconds] = time.split(":").map(Number);
+      return hours * 3600 + minutes * 60 + (seconds || 0);
+    };
+  
+    if (
+      entries.entradaManha === "--:--" ||
+      entries.saidaManha === "--:--" ||
+      entries.entradaTarde === "--:--" ||
+      entries.saidaTarde === "--:--"
+    ) {
+      return 0; // Se algum horário estiver vazio, retorna 0
+    }
+  
+    const morningWork = parseTime(entries.saidaManha) - parseTime(entries.entradaManha);
+    const afternoonWork = parseTime(entries.saidaTarde) - parseTime(entries.entradaTarde);
+  
+    return (morningWork + afternoonWork) / 3600; // Retorna o total em horas
+  };
+  
+  const totalMonthlyHours = allLogs.reduce((total, log) => {
+    const dateObj = new Date(log.date);
+    const dayOfWeek = (dateObj.getDay() + 1) % 7; // 0 = Sábado, 6 = Domingo
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  
+    if (!isWeekend) {
+      return total + calculateDailyHours(log.entries);
+    }
+    return total; // Não soma horas para fins de semana
+  }, 0);
+  
+  
+
+  const handleExportPDF = (employeeDetails: any, logs: TimeLog[]) => {
     const doc = new jsPDF();
-    // Cabeçalho do PDF
     doc.setFontSize(18);
     doc.text("Relatório de Pontos", 105, 10, { align: "center" });
 
+    const address = employeeDetails.address
+    ? `${employeeDetails.address.street}, ${employeeDetails.address.number}${employeeDetails.address.complement ? ` - ${employeeDetails.address.complement}` : ""}, ${employeeDetails.address.neighborhood}, ${employeeDetails.address.city} - ${employeeDetails.address.state}, CEP: ${employeeDetails.address.zipCode}`
+    : "Não informado";
+  
     // Informações do funcionário
     const userInfo = [
       `Nome: ${employeeDetails.name || "Não informado"}`,
       `Email: ${employeeDetails.email || "Não informado"}`,
+      `Endereço: ${address}`,
       `Setor: ${employeeDetails.sector || "Não informado"}`,
       `Função: ${employeeDetails.role || "Não informado"}`,
       `Status: ${employeeDetails.status || "Não informado"}`,
     ];
-
+  
     doc.setFontSize(12);
-    userInfo.forEach((info, index) => {
-      doc.text(info, 10, 20 + index * 6);
+    let yOffset = 20; // Posição inicial para exibir os dados do cabeçalho
+  
+    userInfo.forEach((info) => {
+      const lines = doc.splitTextToSize(info, 190); // Divide o texto para caber na largura
+      doc.text(lines, 10, yOffset);
+      yOffset += lines.length * 6; // Ajusta o espaçamento entre linhas
     });
-
+  
     // Configuração da tabela
     const tableColumns = [
       "Data",
@@ -118,38 +193,51 @@ const EmployeeReport = () => {
       "Saída Manhã",
       "Entrada Tarde",
       "Saída Tarde",
+      "Horas Trabalhadas",
     ];
-    const tableRows = timeLogs.map((log) => [
-      log.date,
-      log.entries.entradaManha || "--:--",
-      log.entries.saidaManha || "--:--",
-      log.entries.entradaTarde || "--:--",
-      log.entries.saidaTarde || "--:--",
-    ]);
+  
+    // Processar dados para o PDF
+    const tableRows = allLogs.map((log) => {
+      const dateObj = new Date(log.date);
+      const dayOfWeek = (dateObj.getDay() + 1) % 7; // 0 = Sábado, 6 = Domingo
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const dailyHours = isWeekend ? "" : calculateDailyHours(log.entries);
+  
+      return [
+        log.date,
+        log.entries.entradaManha,
+        log.entries.saidaManha,
+        log.entries.entradaTarde,
+        log.entries.saidaTarde,
+        dailyHours !== "" ? `${dailyHours.toFixed(2)} horas` : "",
+      ];
+    });
+  
+    // Total mensal excluindo fins de semana
+    const totalMonthlyHours = allLogs.reduce((total, log) => {
+      const dateObj = new Date(log.date);
+      const dayOfWeek = (dateObj.getDay() + 1) % 7;
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  
+      return isWeekend ? total : total + calculateDailyHours(log.entries);
+    }, 0);
+  
     // Renderiza a tabela no PDF
     doc.autoTable({
       head: [tableColumns],
       body: tableRows,
-      startY: 60,
+      startY: yOffset + 10, // Ajusta a posição da tabela com base no cabeçalho
       margin: { top: 10 },
     });
-
+  
+    // Adiciona o total mensal ao final da tabela
+    doc.text(`Total Mensal: ${totalMonthlyHours.toFixed(2)} horas`, 10, doc.lastAutoTable.finalY + 10);
+  
     // Salva o PDF
     doc.save(`Relatorio_${employeeDetails.name || "Usuario"}.pdf`);
   };
-
-  const filteredLogs = timeLogs.filter((log) => {
-    const logDate = new Date(log.date);
-    const isSameDate = selectedDate
-      ? logDate.toISOString().split("T")[0] === selectedDate
-      : true;
-    const isSameMonth = selectedMonth
-      ? logDate.getMonth() + 1 === parseInt(selectedMonth.split("-")[1]) &&
-        logDate.getFullYear() === parseInt(selectedMonth.split("-")[0])
-      : true;
-
-    return isSameDate && isSameMonth;
-  });
+  
+  
 
   return (
     <div className="p-8 bg-gray-900 min-h-screen text-white">
@@ -168,7 +256,8 @@ const EmployeeReport = () => {
         <div className="bg-gray-800 p-4 rounded-lg shadow-md mb-6">
           <p><strong>Nome:</strong> {employeeDetails.name}</p>
           <p><strong>Email:</strong> {employeeDetails.email}</p>
-          <p><strong>Setor:</strong> {employeeDetails.setor || "Não informado"}</p>
+          <p><strong>Endereço:</strong> {employeeDetails.address.street}, {employeeDetails.address.number}, { employeeDetails.address.neighborhood}, {employeeDetails.address.city}, {employeeDetails.address.state}</p>
+          <p><strong>Setor:</strong> {employeeDetails.sector || "Não informado"}</p>
           <p><strong>Função:</strong> {employeeDetails.role || "Não informado"}</p>
           <p><strong>Status:</strong> {employeeDetails.status || "Não informado"}</p>
         </div>
@@ -194,37 +283,56 @@ const EmployeeReport = () => {
           Exportar PDF
         </button>
       </div>
-
       <table className="w-full text-left border-collapse">
-        <thead>
-          <tr>
-            <th className="border-b p-2">Data</th>
-            <th className="border-b p-2">Entrada Manhã</th>
-            <th className="border-b p-2">Saída Manhã</th>
-            <th className="border-b p-2">Entrada Tarde</th>
-            <th className="border-b p-2">Saída Tarde</th>
-            <th className="border-b p-2">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredLogs.map((log) => (
-            <tr key={log.id}>
-              <td className="p-2">{log.date}</td>
-              <td className="p-2">{log.entries.entradaManha || "--:--"}</td>
-              <td className="p-2">{log.entries.saidaManha || "--:--"}</td>
-              <td className="p-2">{log.entries.entradaTarde || "--:--"}</td>
-              <td className="p-2">{log.entries.saidaTarde || "--:--"}</td>
-              <td className="p-2">
-                <button
-                  onClick={() => handleEditClick(log)}
-                  className="text-blue-500 hover:text-blue-700"
-                >
-                  Editar
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
+  <thead>
+    <tr>
+      <th className="border-b p-2">Data</th>
+      <th className="border-b p-2">Entrada Manhã</th>
+      <th className="border-b p-2">Saída Manhã</th>
+      <th className="border-b p-2">Entrada Tarde</th>
+      <th className="border-b p-2">Saída Tarde</th>
+      <th className="border-b p-2">Horas Trabalhadas</th>
+      <th className="border-b p-2">Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+  {allLogs.map((log, index) => {
+    const dateObj = new Date(log.date);
+    const dayOfWeek = (dateObj.getDay() + 1) % 7; // 0 = Sábado, 6 = Domingo
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const dailyHours = isWeekend ? null : calculateDailyHours(log.entries);
+
+    return (
+      <tr key={index}>
+        <td className="p-2">{log.date}</td>
+        <td className="p-2">{log.entries.entradaManha}</td>
+        <td className="p-2">{log.entries.saidaManha}</td>
+        <td className="p-2">{log.entries.entradaTarde}</td>
+        <td className="p-2">{log.entries.saidaTarde}</td>
+        <td className="p-2">{dailyHours !== null ? `${dailyHours.toFixed(2)} horas` : ""}</td>
+        <td className="p-2">
+          {log.entries.entradaManha !== "Sábado" &&
+            log.entries.entradaManha !== "Domingo" &&
+            log.entries.entradaManha !== "--:--" && (
+              <button
+                onClick={() => handleEditClick(log)}
+                className="text-blue-500 hover:text-blue-700"
+              >
+                Editar
+              </button>
+            )}
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
+
+  <tfoot>
+    <tr>
+      <td colSpan={5} className="p-2 text-right font-bold">Total Mensal</td>
+      <td className="p-2 font-bold">{totalMonthlyHours.toFixed(2)} horas</td>
+    </tr>
+  </tfoot>
       </table>
       {isEditModalOpen && logToEdit && (
         <EditLogModal

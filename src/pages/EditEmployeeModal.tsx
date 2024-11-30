@@ -10,7 +10,15 @@ interface Employee {
   role: string;
   sector: string;
   birthDate: string;
-  address: string;
+  address: {
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
   status: string;
   isAdmin: boolean;
 }
@@ -30,23 +38,20 @@ const EditEmployeeModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-
   useEffect(() => {
     if (employee) {
       setFormData(employee);
     }
   }, [employee]);
 
-  // Formatar CPF
   const formatCPF = (value: string) => {
     return value
-      .replace(/\D/g, "") // Remove todos os caracteres não numéricos
+      .replace(/\D/g, "")
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
   };
 
-  // Formatar Data de Nascimento
   const formatDate = (value: string) => {
     return value
       .replace(/\D/g, "")
@@ -60,7 +65,6 @@ const EditEmployeeModal = ({
     const { name, value, type, checked } = e.target as HTMLInputElement;
     let newValue = type === "checkbox" ? checked : value;
 
-    // Formatação específica para CPF e Data de Nascimento
     if (name === "cpf") {
       newValue = formatCPF(value);
     } else if (name === "birthDate") {
@@ -68,172 +72,256 @@ const EditEmployeeModal = ({
     }
 
     if (formData) {
-      setFormData({ ...formData, [name]: newValue });
+      if (name.startsWith("address.")) {
+        const addressField = name.split(".")[1];
+        setFormData({
+          ...formData,
+          address: {
+            ...formData.address,
+            [addressField]: newValue,
+          },
+        });
+      } else {
+        setFormData({ ...formData, [name]: newValue });
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-  
-    if (formData) {
-      setLoading(true);
-      setError(""); // Limpar qualquer erro anterior
-  
-      try {
-        // Envia os dados de atualização para o backend
-        const response = await fetch('http://localhost:5000/update-user', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            uid: formData.id,  // UID do usuário para identificar qual usuário será alterado
-            email: formData.email,  // Novo email
-            displayName: formData.name,  // Nome atualizado
-          }),
-        });
-  
-        // Verifica se a resposta está no formato correto
-        const responseBody = await response.text(); // Lê a resposta como texto
-        console.log('Resposta do servidor:', responseBody);  // Log da resposta em texto
-  
-        // Tenta converter a resposta em JSON
-        let data;
-        try {
-          data = JSON.parse(responseBody);
-          console.log('Resposta JSON:', data);
-        } catch (error) {
-          console.error('Erro ao parsear JSON:', error);
-          setError('Erro ao processar a resposta do servidor.');
-          return;
-        }
-  
-        if (response.status !== 200) {
-          setError(data?.error || 'Erro ao atualizar o usuário');
-          return;
-        }
 
-        // Atualizar os dados do funcionário no Firestore
-        const employeeRef = doc(db, "employees", formData.id);
-        await updateDoc(employeeRef, { ...formData });
-  
-        // Se a resposta for bem-sucedida, chama as funções de atualização
-        onEmployeeUpdated();
-        onClose();
-      } catch (error) {
-        console.error("Erro ao atualizar o funcionário:", error);
-        setError("Erro ao atualizar o funcionário. Tente novamente.");
-      } finally {
-        setLoading(false);
-      }
+    if (!formData) return;
+
+    const today = new Date();
+    const birthDate = new Date(
+      formData.birthDate.split("/").reverse().join("-")
+    );
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const isValidDate = birthDate < today && age >= 16 && age <= 75;
+
+    if (!isValidDate) {
+      setError(
+        "A data de nascimento deve ser válida e indicar pelo menos 16 anos de idade."
+      );
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const employeeRef = doc(db, "employees", formData.id);
+      await updateDoc(employeeRef, {
+        ...formData,
+        address: {
+          street: formData.address.street,
+          number: formData.address.number,
+          complement: formData.address.complement || "",
+          neighborhood: formData.address.neighborhood,
+          city: formData.address.city,
+          state: formData.address.state,
+          zipCode: formData.address.zipCode,
+        },
+      });
+
+      onEmployeeUpdated();
+      onClose();
+    } catch (error) {
+      console.error("Erro ao atualizar funcionário:", error);
+      setError("Erro ao atualizar funcionário. Tente novamente.");
     }
   };
-  
-  
-  
 
   if (!formData) {
     return null;
   }
 
+  const isFormValid = () => {
+    const requiredFields = [
+      "name",
+      "cpf",
+      "email",
+      "role",
+      "sector",
+      "birthDate",
+      "address.street",
+      "address.number",
+      "address.neighborhood",
+      "address.city",
+      "address.state",
+      "address.zipCode",
+    ];
+
+    return requiredFields.every((field) => {
+      const keys = field.split(".");
+      let value = formData as any;
+
+      for (const key of keys) {
+        value = value[key];
+        if (!value) return false;
+      }
+
+      return true;
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-lg w-full text-white">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-3xl w-full text-white">
         <h2 className="text-2xl font-semibold mb-4">Editar {formData.name}</h2>
+        {loading && (
+          <p className="mb-4 text-center text-blue-400">Salvando alterações...</p>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex flex-col">
-              <label htmlFor="name" className="text-m text-gray-400 mb-1">Nome</label>
+              <label className="text-sm text-gray-400 mb-1">
+                Nome <span className="text-red-500">*</span>
+              </label>
               <input
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                placeholder="Nome"
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 rounded bg-gray-700 text-white"
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="cpf" className="text-m text-gray-400 mb-1">CPF</label>
+              <label className="text-sm text-gray-400 mb-1">
+                CPF <span className="text-red-500">*</span>
+              </label>
               <input
                 name="cpf"
                 value={formData.cpf}
                 onChange={handleInputChange}
-                placeholder="CPF"
+                maxLength={14}
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 rounded bg-gray-700 text-white"
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="email" className="text-m text-gray-400 mb-1">Email</label>
+              <label className="text-sm text-gray-400 mb-1">
+                Email <span className="text-red-500">*</span>
+              </label>
               <input
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                placeholder="Email"
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 rounded bg-gray-700 text-white"
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="birthDate" className="text-m text-gray-400 mb-1">Data de Nascimento</label>
+              <label className="text-sm text-gray-400 mb-1">
+                Data de Nascimento <span className="text-red-500">*</span>
+              </label>
               <input
                 name="birthDate"
                 value={formData.birthDate}
                 onChange={handleInputChange}
-                placeholder="Data de Nascimento"
                 required
+                className="w-full p-2 rounded bg-gray-700 text-white"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-gray-400 mb-1">
+                Rua <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="address.street"
+                value={formData.address.street}
+                onChange={handleInputChange}
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-gray-400 mb-1">
+                Número <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="address.number"
+                value={formData.address.number}
+                onChange={handleInputChange}
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="complement" className="text-m text-gray-400 mb-1">
+                Complemento
+              </label>
+              <input
+                name="complement"
+                value={formData.address.complement}
+                onChange={handleInputChange}
+                placeholder="Apto 101"
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="address" className="text-m text-gray-400 mb-1">Endereço Completo</label>
+              <label className="text-sm text-gray-400 mb-1">
+                Bairro <span className="text-red-500">*</span>
+              </label>
               <input
-                name="address"
-                value={formData.address}
+                name="address.neighborhood"
+                value={formData.address.neighborhood}
                 onChange={handleInputChange}
-                placeholder="Endereço Completo"
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 rounded bg-gray-700 text-white"
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="role" className="text-m text-gray-400 mb-1">Função</label>
+              <label className="text-sm text-gray-400 mb-1">
+                Cidade <span className="text-red-500">*</span>
+              </label>
               <input
-                name="role"
-                value={formData.role}
+                name="address.city"
+                value={formData.address.city}
                 onChange={handleInputChange}
-                placeholder="Função"
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 rounded bg-gray-700 text-white"
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="sector" className="text-m text-gray-400 mb-1">Setor</label>
+              <label className="text-sm text-gray-400 mb-1">
+                Estado <span className="text-red-500">*</span>
+              </label>
               <input
-                name="sector"
-                value={formData.sector}
+                name="address.state"
+                value={formData.address.state}
                 onChange={handleInputChange}
-                placeholder="Setor"
                 required
-                className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 rounded bg-gray-700 text-white"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-gray-400 mb-1">
+                CEP <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="address.zipCode"
+                value={formData.address.zipCode}
+                onChange={handleInputChange}
+                required
+                className="w-full p-2 rounded bg-gray-700 text-white"
               />
             </div>
           </div>
-          <div className="flex items-center space-x-2 mt-4">
+          <div className="flex items-center mt-4">
             <input
               type="checkbox"
               name="isAdmin"
               checked={formData.isAdmin}
               onChange={handleInputChange}
-              className="form-checkbox h-5 w-5 text-green-600 focus:ring-2 focus:ring-blue-500 rounded"
+              className="form-checkbox h-5 w-5 text-blue-500"
             />
-            <label className="text-white">Administrador</label>
+            <label className="ml-2 text-gray-300">Administrador</label>
           </div>
           <button
             type="submit"
-            disabled={loading}
-            className={`w-full bg-green-600 py-2 rounded transition text-white font-bold ${
+            disabled={loading || !isFormValid()}
+            className={`w-full bg-green-600 py-2 rounded text-white font-bold ${
               loading ? "opacity-50 cursor-not-allowed" : "hover:bg-green-700"
             }`}
           >
@@ -242,8 +330,7 @@ const EditEmployeeModal = ({
         </form>
         <button
           onClick={onClose}
-          disabled={loading}
-          className="mt-4 w-full bg-red-600 py-2 rounded hover:bg-red-700 transition text-white font-bold"
+          className="mt-4 w-full bg-red-600 py-2 rounded text-white font-bold hover:bg-red-700"
         >
           Cancelar
         </button>

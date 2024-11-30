@@ -17,7 +17,15 @@ interface Employee {
   sector: string;
   role: string;
   birthDate: string;
-  address: string;
+  address: {
+    street: string,
+    number: string,
+    complement: string,
+    neighborhood: string,
+    city: string,
+    state: string,
+    zipCode: string,
+  },
   status: string;
   isAdmin: boolean;
 }

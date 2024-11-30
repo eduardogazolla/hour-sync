@@ -39,7 +39,7 @@ const TimeTrackingPage = () => {
     entradaManha: { start: "07:40", end: "08:05" },
     saidaManha: { start: "12:00", end: "12:10" },
     entradaTarde: { start: "12:50", end: "13:05" },
-    saidaTarde: { start: "18:00", end: "18:10" },
+    saidaTarde: { start: "17:00", end: "17:10" },
   };
 
   // Obtém o horário do servidor
@@ -52,8 +52,21 @@ const TimeTrackingPage = () => {
         throw new Error("Erro ao buscar horário do servidor.");
       }
       const data = await response.json();
-      const serverTime = new Date(data.dateTime);
-
+  
+      const useSimulation = true; // Altere para `false` em produção
+      let serverTime = new Date(data.dateTime);
+  
+      if (useSimulation) {
+        const simulatedDate = "2024-11-30"; // Ajuste a data simulada
+        const simulatedTime = "17:00"; // Ajuste o horário simulado (HH:mm)
+  
+        const [year, month, day] = simulatedDate.split("-").map(Number);
+        const [hour, minute] = simulatedTime.split(":").map(Number);
+  
+        serverTime.setFullYear(year, month - 1, day); // Ajusta a data
+        serverTime.setHours(hour, minute, 0); // Ajusta o horário
+      }
+  
       setServerTime(serverTime);
     } catch (error) {
       console.error("Erro ao buscar horário do servidor:", error);
@@ -78,37 +91,21 @@ const TimeTrackingPage = () => {
   // Cria um novo registro diário, se necessário
   const createDailyLogIfNotExists = async () => {
     if (!userId || !serverTime) return;
-
+  
     const today = new Date(serverTime).toISOString().split("T")[0];
     const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
-
+  
     try {
       const docSnapshot = await getDoc(userDocRef);
-      if (!docSnapshot.exists()) {
-        await setDoc(userDocRef, {
-          userId,
-          userName: auth.currentUser?.displayName || "",
-          date: today,
-          entries: {
-            entradaManha: "",
-            saidaManha: "",
-            entradaTarde: "",
-            saidaTarde: "",
-          },
-        });
-        setTimeEntries({
-          entradaManha: "",
-          saidaManha: "",
-          entradaTarde: "",
-          saidaTarde: "",
-        });
-      } else {
+      if (docSnapshot.exists()) {
+        // Carrega os dados existentes no estado para exibição
         setTimeEntries(docSnapshot.data().entries || {});
       }
     } catch (error) {
-      console.error("Erro ao criar ou carregar registro diário:", error);
+      console.error("Erro ao verificar o registro diário:", error);
     }
   };
+  
 
   useEffect(() => {
     fetchServerTime();
@@ -126,55 +123,85 @@ const TimeTrackingPage = () => {
 
   // Verifica se o horário está dentro do permitido
   const isWithinSchedule = (action: string) => {
-    if (!serverTime) return false;
-
+    if (!serverTime) return { withinSchedule: false, message: "" };
+  
     const currentTime = serverTime.toTimeString().slice(0, 5);
     const { start, end } = scheduleLimits[action as keyof typeof scheduleLimits];
-
-    return currentTime >= start && currentTime <= end;
+  
+    const withinSchedule = currentTime >= start && currentTime <= end;
+    const message = `O horário permitido para ${action.replace(/([A-Z])/g, " $1")} é das ${start} às ${end}.`;
+  
+    return { withinSchedule, message };
   };
+  
 
   // Registra o ponto
   const handleRegister = async (type: "entrada" | "saida") => {
     if (!userId || !serverTime || !userDisplayName) return;
-
+  
     const today = new Date(serverTime).toISOString().split("T")[0];
+    const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
+
+      // Verifica se é final de semana
+  const dayOfWeek = serverTime.getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    setErrorMessage("Registro de ponto não permitido em finais de semana.");
+    setTimeout(() => setErrorMessage(""), 5000);
+    return;
+  }
+  
     const actions = {
       entrada: ["entradaManha", "entradaTarde"],
       saida: ["saidaManha", "saidaTarde"],
     };
-
-    const nextAction = actions[type].find(
-      (action) => !timeEntries[action as keyof typeof timeEntries]
-    );
-
-    if (!nextAction) {
-      setErrorMessage(
-        `Todos os pontos de ${type} do dia já foram registrados.`
-      );
+  
+    // Encontrar a próxima ação válida com base no horário atual
+    const currentAction = actions[type].find((action) => {
+      const { withinSchedule } = isWithinSchedule(action);
+      return withinSchedule && !timeEntries[action as keyof typeof timeEntries];
+    });
+  
+    if (!currentAction) {
+      setErrorMessage(`Nenhum horário permitido para ${type} está disponível no momento.`);
       setTimeout(() => setErrorMessage(""), 5000);
       return;
     }
-
-    if (!isWithinSchedule(nextAction)) {
-      setErrorMessage(`Horário inválido para ${type}.`);
-      setTimeout(() => setErrorMessage(""), 5000);
-      return;
-    }
-
+  
     try {
-      const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
+      // Verifica se o documento já existe
+      const docSnapshot = await getDoc(userDocRef);
+      if (!docSnapshot.exists()) {
+        await setDoc(userDocRef, {
+          userId,
+          userName: userDisplayName,
+          date: today,
+          entries: {
+            entradaManha: "",
+            saidaManha: "",
+            entradaTarde: "",
+            saidaTarde: "",
+          },
+        });
+      }
+  
+      // Registra o ponto
       const timeToSave = serverTime.toLocaleTimeString("pt-BR");
       await updateDoc(userDocRef, {
-        [`entries.${nextAction}`]: timeToSave,
+        [`entries.${currentAction}`]: timeToSave,
       });
-
-      setMessage(`${type === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`);
+  
+      setMessage(
+        `${type === "entrada" ? "Entrada" : "Saída"} para ${currentAction.replace(
+          /([A-Z])/g,
+          " $1"
+        )} registrada com sucesso!`
+      );
       setTimeout(() => setMessage(""), 5000);
-
+  
+      // Atualiza os registros locais
       setTimeEntries((prevEntries) => ({
         ...prevEntries,
-        [nextAction]: timeToSave,
+        [currentAction]: timeToSave,
       }));
     } catch (error) {
       console.error("Erro ao registrar ponto:", error);
@@ -182,7 +209,8 @@ const TimeTrackingPage = () => {
       setTimeout(() => setErrorMessage(""), 5000);
     }
   };
-
+  
+  
   const handleLogout = async () => {
     try {
       await signOut(auth);

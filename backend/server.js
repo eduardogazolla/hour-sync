@@ -100,27 +100,52 @@ app.post("/create-user", async (req, res) => {
 
 // Atualizar usuário no Firebase Authentication
 app.post("/update-user", async (req, res) => {
-  const { uid, email, displayName } = req.body;
+  const { uid, email, displayName, cpf, birthDate, address, role, isAdmin, sector, status } = req.body;
 
   try {
-    // Verificar se o usuário existe
+    // Verificar se o usuário existe no Firebase Authentication
     const userRecord = await admin.auth().getUser(uid);
 
-    // Atualizar o usuário
-    const updatedUser = await admin.auth().updateUser(uid, {
+    // Atualizar os dados no Firebase Authentication
+    await admin.auth().updateUser(uid, {
       email,
       displayName,
     });
 
-    // Enviar a resposta com sucesso
+    // Atualizar os dados no Firestore
+    const db = admin.firestore();
+    const employeeRef = db.collection("employees").doc(uid);
+
+    // Atualiza apenas os campos enviados para evitar sobrescrever outros valores existentes
+    const updatedData = {
+      email: email || userRecord.email,
+      name: displayName || userRecord.displayName,
+      cpf: cpf || "",
+      birthDate: birthDate || "",
+      address: {
+        rua: address?.street || "",
+        numero: address?.number || "",
+        complemento: address?.complement || "",
+        bairro: address?.neighborhood || "",
+        cidade: address?.city || "",
+        estado: address?.state || "",
+        cep: address?.zipCode || "",
+      },
+      role: role || "",
+      isAdmin: isAdmin !== undefined ? isAdmin : false,
+      sector: sector || "",
+      status: status || "ativo",
+    };
+
+    await employeeRef.update(updatedData);
+
     return res.status(200).json({
       message: "Usuário atualizado com sucesso.",
-      user: updatedUser,
+      updatedData,
     });
   } catch (error) {
     console.error("Erro ao atualizar o usuário:", error);
 
-    // Responder com erro em formato JSON
     return res.status(500).json({
       error: error.message || "Erro desconhecido ao atualizar o usuário.",
     });
@@ -128,19 +153,33 @@ app.post("/update-user", async (req, res) => {
 });
 
 
+
 app.post("/register-point", async (req, res) => {
-  const { userId, timestamp, type } = req.body;
+  const { userId, timestamp, type, userName } = req.body;
+
+  // Validação inicial
+  if (!userId || !timestamp || !type || !userName) {
+    return res.status(400).send({ error: "Dados incompletos fornecidos." });
+  }
+
   const currentTime = new Date(timestamp);
 
+  // Log do horário recebido para depuração
+  console.log("Timestamp recebido:", timestamp);
+  console.log("Horário interpretado:", currentTime.toISOString());
+
+  // Configuração dos limites de horários
   const scheduleLimits = {
     entradaManha: { start: "07:40", end: "08:05" },
     saidaManha: { start: "12:00", end: "12:10" },
     entradaTarde: { start: "12:50", end: "13:05" },
-    saidaTarde: { start: "18:00", end: "18:10" },
+    saidaTarde: { start: "17:00", end: "17:10" },
   };
 
   try {
+    // Verifica se o tipo de ponto é válido
     if (!scheduleLimits[type]) {
+      console.error("Tipo de ponto inválido:", type);
       return res.status(400).send({ error: "Tipo de ponto inválido." });
     }
 
@@ -154,15 +193,32 @@ app.post("/register-point", async (req, res) => {
     const endLimit = new Date(currentTime);
     endLimit.setHours(Number(endHour), Number(endMinute), 59);
 
+    // Logs para depuração de horários
+    console.log(`Validando ${type}:`);
+    console.log("Horário atual:", currentTime.toISOString());
+    console.log("Início permitido:", startLimit.toISOString());
+    console.log("Fim permitido:", endLimit.toISOString());
+
+    // Valida o horário do ponto
     if (currentTime < startLimit || currentTime > endLimit) {
       return res.status(400).send({
-        error: `Horário fora do limite permitido para ${type}.`,
+        error: `Horário fora do limite permitido para ${type}. O horário permitido é das ${start} às ${end}.`,
       });
     }
 
+    // Valida se é fim de semana
+    const dayOfWeek = currentTime.getDay(); // 0 = Domingo, 6 = Sábado
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return res.status(400).send({
+        error: "Registro de ponto não permitido em fins de semana.",
+      });
+    }
+
+    // Salva no Firestore apenas se todas as condições forem satisfeitas
     const db = admin.firestore();
     await db.collection("timeTracking").add({
       userId,
+      userName,
       type,
       timestamp: admin.firestore.Timestamp.fromDate(currentTime),
     });
@@ -173,6 +229,7 @@ app.post("/register-point", async (req, res) => {
     res.status(500).send({ error: "Erro ao registrar ponto." });
   }
 });
+
 
 // Endpoint para ativar/inativar um usuário
 app.post("/toggle-user-status", async (req, res) => {
