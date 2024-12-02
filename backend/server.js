@@ -3,6 +3,9 @@ const express = require("express");
 const admin = require("firebase-admin");
 const schedule = require("node-schedule");
 const cors = require("cors");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
 app.use(cors());
@@ -12,6 +15,35 @@ app.use(express.json());
 admin.initializeApp({
   credential: admin.credential.cert(require("./serviceAccountKey.json")),
 });
+
+// Configuração do Multer para armazenamento
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Diretório onde os arquivos serão armazenados
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage });
+
+// Endpoint para upload de justificativas
+app.post("/upload-justification", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).send({ error: "Nenhum arquivo enviado!" });
+  }
+
+  // Construir a URL do arquivo
+  const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+
+  // Retornar a URL para o front-end salvar no banco de dados
+  res.status(200).send({ fileUrl });
+});
+
+// Middleware para servir arquivos estáticos da pasta uploads
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const createDailyLogs = async () => {
   try {
