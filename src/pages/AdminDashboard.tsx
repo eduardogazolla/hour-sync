@@ -47,15 +47,30 @@ interface Employee {
 }
 
 const AdminDashboard = () => {
-  const [adminSortConfig, setAdminSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
-  const [collabSortConfig, setCollabSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
+  const [adminSortConfig, setAdminSortConfig] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  } | null>(null);
+  const [collabSortConfig, setCollabSortConfig] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  } | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    `${new Date().getFullYear()}-${(new Date().getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}`
+  );
 
   const sortTable = (key: string, isAdmin: boolean) => {
     const sortConfig = isAdmin ? adminSortConfig : collabSortConfig;
     const setSortConfig = isAdmin ? setAdminSortConfig : setCollabSortConfig;
 
     let direction: "asc" | "desc" = "asc";
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
+    if (
+      sortConfig &&
+      sortConfig.key === key &&
+      sortConfig.direction === "asc"
+    ) {
       direction = "desc";
     }
 
@@ -146,15 +161,14 @@ const AdminDashboard = () => {
   const exportSelectedReports = async () => {
     for (const userId of selectedUsers) {
       try {
-        // Buscar dados do funcionário
+        // Fetch employee details
         const userDocRef = doc(db, "employees", userId);
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
           const employeeDetails = userDoc.data();
 
-          // Buscar logs do funcionário
-          // Buscar logs do funcionário
+          // Fetch time logs
           const logsRef = collection(db, "timeLogs");
           const logsQuery = query(logsRef, where("userId", "==", userId));
           const logsSnapshot = await getDocs(logsQuery);
@@ -165,7 +179,59 @@ const AdminDashboard = () => {
             entries: doc.data().entries || {},
           }));
 
-          // Criar PDF
+          // Generate days of the month
+          const generateDaysOfMonth = (month: string): string[] => {
+            const [year, monthIndex] = month.split("-").map(Number);
+            const daysInMonth = new Date(year, monthIndex, 0).getDate();
+            return Array.from(
+              { length: daysInMonth },
+              (_, i) =>
+                `${year}-${String(monthIndex).padStart(2, "0")}-${String(
+                  i + 1
+                ).padStart(2, "0")}`
+            );
+          };
+
+          // Calculate daily hours
+          const calculateDailyHours = (entries: any) => {
+            const parseTime = (time: string) => {
+              const [hours, minutes, seconds] = time.split(":").map(Number);
+              return hours * 3600 + minutes * 60 + (seconds || 0);
+            };
+
+            let totalSeconds = 0;
+
+            // Morning hours
+            if (
+              entries.entradaManha &&
+              entries.saidaManha &&
+              entries.entradaManha !== "--:--" &&
+              entries.saidaManha !== "--:--"
+            ) {
+              totalSeconds +=
+                parseTime(entries.saidaManha) - parseTime(entries.entradaManha);
+            }
+
+            // Afternoon hours
+            if (
+              entries.entradaTarde &&
+              entries.saidaTarde &&
+              entries.entradaTarde !== "--:--" &&
+              entries.saidaTarde !== "--:--"
+            ) {
+              totalSeconds +=
+                parseTime(entries.saidaTarde) - parseTime(entries.entradaTarde);
+            }
+
+            // Convert to hours and minutes
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            return totalSeconds > 0 ? `${hours}h ${minutes}m` : "0h 0m";
+          };
+
+          const daysOfMonth = generateDaysOfMonth(selectedMonth);
+
+          // Generate PDF
           const docPdf = new jsPDF();
           docPdf.setFontSize(18);
           docPdf.text("Relatório de Pontos", 105, 10, { align: "center" });
@@ -184,7 +250,7 @@ const AdminDashboard = () => {
               }`
             : "Não informado";
 
-          // Informações do funcionário
+          // Employee information
           const userInfo = [
             `Nome: ${employeeDetails.name || "Não informado"}`,
             `Email: ${employeeDetails.email || "Não informado"}`,
@@ -195,15 +261,14 @@ const AdminDashboard = () => {
           ];
 
           docPdf.setFontSize(12);
-          let yOffset = 20; // Posição inicial para exibir os dados do cabeçalho
-
+          let yOffset = 20;
           userInfo.forEach((info) => {
-            const lines = docPdf.splitTextToSize(info, 190); // Divide o texto para caber na largura
+            const lines = docPdf.splitTextToSize(info, 190);
             docPdf.text(lines, 10, yOffset);
-            yOffset += lines.length * 6; // Ajusta o espaçamento entre linhas
+            yOffset += lines.length * 6;
           });
 
-          // Configuração da tabela
+          // Table configuration
           const tableColumns = [
             "Data",
             "Entrada Manhã",
@@ -213,87 +278,129 @@ const AdminDashboard = () => {
             "Horas Trabalhadas",
           ];
 
-          // Processar dados para o PDF
-          const tableRows = logs.map((log) => {
-            const calculateDailyHours = (entries: any) => {
-              const parseTime = (time: string) => {
-                const [hours, minutes] = time.split(":").map(Number);
-                return hours * 60 + minutes;
-              };
+          // Table rows
+          const tableRows = daysOfMonth.map((date) => {
+            const log = logs.find((log) => log.date === date);
+            const dateObj = new Date(date);
+            const dayOfWeek = (dateObj.getDay() + 1) % 7;
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const weekendLabel =
+              dayOfWeek === 0 ? "Domingo" : dayOfWeek === 6 ? "Sábado" : "";
 
-              if (
-                entries.entradaManha === "--:--" ||
-                entries.saidaManha === "--:--" ||
-                entries.entradaTarde === "--:--" ||
-                entries.saidaTarde === "--:--"
-              ) {
-                return 0;
+            const formatField = (
+              field: string | undefined,
+              justification?: string
+            ) => {
+              if (field && field !== "--:--") {
+                return field;
+              } else if (justification) {
+                return "Justificado";
               }
-
-              const morningWork =
-                parseTime(entries.saidaManha) - parseTime(entries.entradaManha);
-              const afternoonWork =
-                parseTime(entries.saidaTarde) - parseTime(entries.entradaTarde);
-
-              return (morningWork + afternoonWork) / 60;
+              return "--:--";
             };
 
-            const dailyHours = calculateDailyHours(log.entries);
+            const dailyHours = log
+              ? calculateDailyHours(log.entries)
+              : isWeekend
+              ? ""
+              : "0h 0m";
 
             return [
-              log.date,
-              log.entries.entradaManha || "--:--",
-              log.entries.saidaManha || "--:--",
-              log.entries.entradaTarde || "--:--",
-              log.entries.saidaTarde || "--:--",
-              dailyHours !== 0 ? `${dailyHours.toFixed(2)} horas` : "",
+              date,
+              isWeekend
+                ? weekendLabel
+                : formatField(
+                    log?.entries.entradaManha,
+                    log?.entries.entradaManhaJustification
+                  ),
+              isWeekend
+                ? weekendLabel
+                : formatField(
+                    log?.entries.saidaManha,
+                    log?.entries.saidaManhaJustification
+                  ),
+              isWeekend
+                ? weekendLabel
+                : formatField(
+                    log?.entries.entradaTarde,
+                    log?.entries.entradaTardeJustification
+                  ),
+              isWeekend
+                ? weekendLabel
+                : formatField(
+                    log?.entries.saidaTarde,
+                    log?.entries.saidaTardeJustification
+                  ),
+              dailyHours,
             ];
           });
 
-          // Renderiza a tabela no PDF
+          // Render table in PDF
           docPdf.autoTable({
             head: [tableColumns],
             body: tableRows,
-            startY: yOffset + 10, // Ajusta a posição da tabela com base no cabeçalho
-            margin: { top: 10 },
+            startY: yOffset + 10,
           });
 
-          // Total mensal
-          const totalMonthlyHours = logs.reduce((total, log) => {
-            const calculateDailyHours = (entries: any) => {
+          // Calculate total monthly hours
+          const totalMonthlyHours = logs.reduce((totalSeconds, log) => {
+            const dateObj = new Date(log.date);
+            const dayOfWeek = (dateObj.getDay() + 1) % 7; // 0 = Saturday, 6 = Sunday
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+            if (!isWeekend) {
               const parseTime = (time: string) => {
-                const [hours, minutes] = time.split(":").map(Number);
-                return hours * 60 + minutes;
+                if (!time || time === "--:--") return 0;
+                const [hours, minutes, seconds] = time.split(":").map(Number);
+                return hours * 3600 + minutes * 60 + (seconds || 0);
               };
 
+              const entries = log.entries;
+
+              // Morning hours
               if (
-                entries.entradaManha === "--:--" ||
-                entries.saidaManha === "--:--" ||
-                entries.entradaTarde === "--:--" ||
-                entries.saidaTarde === "--:--"
+                entries.entradaManha &&
+                entries.saidaManha &&
+                entries.entradaManha !== "--:--" &&
+                entries.saidaManha !== "--:--"
               ) {
-                return 0;
+                totalSeconds +=
+                  parseTime(entries.saidaManha) -
+                  parseTime(entries.entradaManha);
               }
 
-              const morningWork =
-                parseTime(entries.saidaManha) - parseTime(entries.entradaManha);
-              const afternoonWork =
-                parseTime(entries.saidaTarde) - parseTime(entries.entradaTarde);
+              // Afternoon hours
+              if (
+                entries.entradaTarde &&
+                entries.saidaTarde &&
+                entries.entradaTarde !== "--:--" &&
+                entries.saidaTarde !== "--:--"
+              ) {
+                totalSeconds +=
+                  parseTime(entries.saidaTarde) -
+                  parseTime(entries.entradaTarde);
+              }
+            }
 
-              return (morningWork + afternoonWork) / 60;
-            };
-
-            return total + calculateDailyHours(log.entries);
+            return totalSeconds;
           }, 0);
 
+          // Convert total seconds into hours and minutes
+          const totalHours = Math.floor(totalMonthlyHours / 3600);
+          const totalMinutes = Math.floor((totalMonthlyHours % 3600) / 60);
+
+          // Format total monthly hours as "Xh Ym"
+          const formattedTotalMonthlyHours = `${totalHours}h ${totalMinutes}m`;
+
+          // Add total to the PDF
           docPdf.text(
-            `Total Mensal: ${totalMonthlyHours.toFixed(2)} horas`,
+            `Total Mensal: ${formattedTotalMonthlyHours}`,
             10,
             docPdf.lastAutoTable.finalY + 10
           );
 
-          // Salva o PDF
-          docPdf.save(`Relatorio_${employeeDetails.name || "Usuario"}.pdf`);
+          // Save the PDF
+          docPdf.save(`Relatorio_${employeeDetails.name || "Usuario"}_${selectedMonth}.pdf`);
         }
       } catch (error) {
         console.error("Erro ao exportar relatório:", error);
@@ -465,21 +572,36 @@ const AdminDashboard = () => {
           <table className="table-auto w-full text-left text-white">
             <thead>
               <tr>
-              <th onClick={() => sortTable("name", true)} className="cursor-pointer">
-                Nome {getSortIndicator("name", true)}
-              </th>
-              <th onClick={() => sortTable("email", true)} className="cursor-pointer">
-                Email {getSortIndicator("email", true)}
-              </th>
-              <th onClick={() => sortTable("sector", true)} className="cursor-pointer">
-                Setor {getSortIndicator("sector", true)}
-              </th>
-              <th onClick={() => sortTable("role", true)} className="cursor-pointer">
-                Função {getSortIndicator("role", true)}
-              </th>
-              <th onClick={() => sortTable("status", true)} className="cursor-pointer">
-                Status {getSortIndicator("status", true)}
-              </th>
+                <th
+                  onClick={() => sortTable("name", true)}
+                  className="cursor-pointer"
+                >
+                  Nome {getSortIndicator("name", true)}
+                </th>
+                <th
+                  onClick={() => sortTable("email", true)}
+                  className="cursor-pointer"
+                >
+                  Email {getSortIndicator("email", true)}
+                </th>
+                <th
+                  onClick={() => sortTable("sector", true)}
+                  className="cursor-pointer"
+                >
+                  Setor {getSortIndicator("sector", true)}
+                </th>
+                <th
+                  onClick={() => sortTable("role", true)}
+                  className="cursor-pointer"
+                >
+                  Função {getSortIndicator("role", true)}
+                </th>
+                <th
+                  onClick={() => sortTable("status", true)}
+                  className="cursor-pointer"
+                >
+                  Status {getSortIndicator("status", true)}
+                </th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -597,21 +719,36 @@ const AdminDashboard = () => {
           <table className="table-auto w-full text-left text-white">
             <thead>
               <tr>
-              <th onClick={() => sortTable("name", false)} className="cursor-pointer">
-                Nome {getSortIndicator("name", false)}
-              </th>
-              <th onClick={() => sortTable("email", false)} className="cursor-pointer">
-                Email {getSortIndicator("email", false)}
-              </th>
-              <th onClick={() => sortTable("sector", false)} className="cursor-pointer">
-                Setor {getSortIndicator("sector", false)}
-              </th>
-              <th onClick={() => sortTable("role", false)} className="cursor-pointer">
-                Função {getSortIndicator("role", false)}
-              </th>
-              <th onClick={() => sortTable("status", false)} className="cursor-pointer">
-                Status {getSortIndicator("status", false)}
-              </th>
+                <th
+                  onClick={() => sortTable("name", false)}
+                  className="cursor-pointer"
+                >
+                  Nome {getSortIndicator("name", false)}
+                </th>
+                <th
+                  onClick={() => sortTable("email", false)}
+                  className="cursor-pointer"
+                >
+                  Email {getSortIndicator("email", false)}
+                </th>
+                <th
+                  onClick={() => sortTable("sector", false)}
+                  className="cursor-pointer"
+                >
+                  Setor {getSortIndicator("sector", false)}
+                </th>
+                <th
+                  onClick={() => sortTable("role", false)}
+                  className="cursor-pointer"
+                >
+                  Função {getSortIndicator("role", false)}
+                </th>
+                <th
+                  onClick={() => sortTable("status", false)}
+                  className="cursor-pointer"
+                >
+                  Status {getSortIndicator("status", false)}
+                </th>
                 <th>Ações</th>
               </tr>
             </thead>

@@ -16,33 +16,64 @@ admin.initializeApp({
   credential: admin.credential.cert(require("./serviceAccountKey.json")),
 });
 
-// Configuração do Multer para armazenamento
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Diretório onde os arquivos serão armazenados
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, "uploads/");
+    },
+    filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = ["image/jpeg", "image/png", "application/pdf"];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Formato de arquivo não suportado."));
+    }
   },
 });
-
-const upload = multer({ storage });
 
 // Endpoint para upload de justificativas
 app.post("/upload-justification", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).send({ error: "Nenhum arquivo enviado!" });
+  try {
+    if (!req.file) {
+      return res.status(400).send({ error: "Nenhum arquivo enviado!" });
+    }
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    res.status(200).send({ fileUrl });
+  } catch (error) {
+    console.error("Erro no upload:", error.message);
+    res.status(500).send({ error: "Erro interno no servidor." });
   }
-
-  // Construir a URL do arquivo
-  const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-
-  // Retornar a URL para o front-end salvar no banco de dados
-  res.status(200).send({ fileUrl });
 });
 
+const uploadDir = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
 // Middleware para servir arquivos estáticos da pasta uploads
+app.post('/uploads', (req, res) => {
+  upload(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      // Erros relacionados ao multer
+      return res.status(400).json({ error: err.message });
+    } else if (err) {
+      // Outros erros
+      return res.status(500).json({ error: 'Erro no servidor' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+
+    res.status(200).json({ message: 'Upload bem-sucedido', file: req.file });
+  });
+});
+
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const createDailyLogs = async () => {
@@ -201,8 +232,6 @@ app.post("/update-user", async (req, res) => {
     });
   }
 });
-
-
 
 app.post("/register-point", async (req, res) => {
   const { userId, timestamp, type, userName } = req.body;

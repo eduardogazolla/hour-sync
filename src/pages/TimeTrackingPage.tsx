@@ -32,15 +32,13 @@ const TimeTrackingPage = () => {
 
   // Função para upload e salvar justificativa
   const handleFileUpload = async () => {
-    if (!selectedFile || !selectedTimeSlot || !userId || !serverTime) {
-      setUploadMessage(
-        "Por favor, selecione um arquivo e um horário para justificar."
-      );
+    if (!selectedFile || !selectedTimeSlot) {
+      setUploadMessage("Por favor, selecione um arquivo e um horário para justificar.");
       return;
     }
 
     const formData = new FormData();
-    formData.append("justification", selectedFile);
+    formData.append("file", selectedFile);
 
     try {
       // Faz o upload do arquivo para o servidor
@@ -66,7 +64,7 @@ const TimeTrackingPage = () => {
       // Atualiza o estado local para refletir na interface
       setTimeEntries((prevEntries) => ({
         ...prevEntries,
-        [`${selectedTimeSlot}Justification`]: "Justificado",
+        [`${selectedTimeSlot}Justification`]: response.data.fileUrl,
       }));
 
       setUploadMessage("Justificativa enviada e salva com sucesso!");
@@ -111,8 +109,8 @@ const TimeTrackingPage = () => {
       let serverTime = new Date(data.dateTime);
 
       if (useSimulation) {
-        const simulatedDate = "2024-12-03"; // Ajuste a data simulada
-        const simulatedTime = "13:00"; // Ajuste o horário simulado (HH:mm)
+        const simulatedDate = "2024-12-02"; // Ajuste a data simulada
+        const simulatedTime = "17:00"; // Ajuste o horário simulado (HH:mm)
 
         const [year, month, day] = simulatedDate.split("-").map(Number);
         const [hour, minute] = simulatedTime.split(":").map(Number);

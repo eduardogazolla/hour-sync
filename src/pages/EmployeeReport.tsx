@@ -315,17 +315,23 @@ const EmployeeReport = () => {
       const dayOfWeek = (dateObj.getDay() + 1) % 7; // 0 = Sábado, 6 = Domingo
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-      const formatField = (field: string, justification?: string) => {
-        if (justification) {
-          return "Justificado"; // Exibe "Justificado" se houver justificativa
-        }
+      const formatField = (
+        field: string | undefined,
+        justification?: string
+      ) => {
         if (field && field !== "--:--") {
-          return field; // Exibe o campo se ele tiver um valor válido
+          return field;
+        } else if (justification) {
+          return "Justificado";
         }
-        return "--:--"; // Caso contrário, exibe "--:--"
+        return "--:--"; // Campo vazio se não houver nada
       };
 
-      const dailyHours = log ? calculateDailyHours(log.entries) : "0h 0m"; // Calcula horas se houver registro
+      const dailyHours = log
+        ? calculateDailyHours(log.entries)
+        : isWeekend
+        ? ""
+        : "0h 0m"; // Calcula horas se houver registro
 
       return [
         date,
@@ -333,23 +339,35 @@ const EmployeeReport = () => {
           ? dayOfWeek === 0
             ? "Domingo"
             : "Sábado"
-          : formatField(log?.entries.entradaManha || "--:--"),
+          : formatField(
+              log?.entries.entradaManha,
+              log?.entries.entradaManhaJustification
+            ),
         isWeekend
           ? dayOfWeek === 0
             ? "Domingo"
             : "Sábado"
-          : formatField(log?.entries.saidaManha || "--:--"),
+          : formatField(
+              log?.entries.saidaManha,
+              log?.entries.saidaManhaJustification
+            ),
         isWeekend
           ? dayOfWeek === 0
             ? "Domingo"
             : "Sábado"
-          : formatField(log?.entries.entradaTarde || "--:--"),
+          : formatField(
+              log?.entries.entradaTarde,
+              log?.entries.entradaTardeJustification
+            ),
         isWeekend
           ? dayOfWeek === 0
             ? "Domingo"
             : "Sábado"
-          : formatField(log?.entries.saidaTarde || "--:--"),
-        dailyHours || "", // Adiciona as horas trabalhadas ou "0h 0m"
+          : formatField(
+              log?.entries.saidaTarde,
+              log?.entries.saidaTardeJustification
+            ),
+        dailyHours, // Horas trabalhadas
       ];
     });
 
@@ -369,7 +387,9 @@ const EmployeeReport = () => {
     );
 
     // Salva o PDF
-    doc.save(`Relatorio_${employeeDetails.name || "Usuario"}.pdf`);
+    doc.save(
+      `Relatorio_${employeeDetails.name || "Usuario"}_${selectedMonth}.pdf`
+    );
   };
 
   return (
@@ -450,63 +470,51 @@ const EmployeeReport = () => {
             const dateObj = new Date(log.date);
             const dayOfWeek = (dateObj.getDay() + 1) % 7; // 0 = Sábado, 6 = Domingo
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const formatField = (field, justification) => {
+              if (justification) {
+                return (
+                  <a
+                    href={justification}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 underline"
+                  >
+                    Justificado
+                  </a>
+                );
+              } else if (field && field !== "--:--") {
+                return field;
+              }
+              return "--:--"; // Campo vazio exibe "--:--"
+            };
             const dailyHours = isWeekend
               ? null
               : calculateDailyHours(log.entries);
-
             return (
               <tr key={index}>
                 <td className="p-2">{log.date}</td>
                 <td className="p-2">
-                  {log.entries.entradaManha}
-                  {log.entries.entradaManhaJustification && (
-                    <a
-                      href={log.entries.entradaManhaJustification}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 underline ml-2"
-                    >
-                      Justificativa
-                    </a>
+                  {formatField(
+                    log.entries.entradaManha,
+                    log.entries.entradaManhaJustification
                   )}
                 </td>
                 <td className="p-2">
-                  {log.entries.saidaManha}
-                  {log.entries.saidaManhaJustification && (
-                    <a
-                      href={log.entries.saidaManhaJustification}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 underline ml-2"
-                    >
-                      Justificativa
-                    </a>
+                  {formatField(
+                    log.entries.saidaManha,
+                    log.entries.saidaManhaJustification
                   )}
                 </td>
                 <td className="p-2">
-                  {log.entries.entradaTarde}
-                  {log.entries.entradaTardeJustification && (
-                    <a
-                      href={log.entries.entradaTardeJustification}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 underline ml-2"
-                    >
-                      Justificativa
-                    </a>
+                  {formatField(
+                    log.entries.entradaTarde,
+                    log.entries.entradaTardeJustification
                   )}
                 </td>
                 <td className="p-2">
-                  {log.entries.saidaTarde}
-                  {log.entries.saidaTardeJustification && (
-                    <a
-                      href={log.entries.saidaTardeJustification}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 underline ml-2"
-                    >
-                      Justificativa
-                    </a>
+                  {formatField(
+                    log.entries.saidaTarde,
+                    log.entries.saidaTardeJustification
                   )}
                 </td>
                 <td className="p-2">
