@@ -37,6 +37,7 @@ const EditEmployeeModal = ({
   const [formData, setFormData] = useState<Employee | null>(employee);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  console.error(error);
 
   useEffect(() => {
     if (employee) {
@@ -133,6 +134,39 @@ const EditEmployeeModal = ({
         isAdmin: formData.isAdmin,
         status: formData.status,
       });
+
+      // Atualiza o email no Firebase Authentication
+    const response = await fetch("http://localhost:5000/update-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        uid: formData.id,  // O ID do funcionário no Firestore
+        name: formData.name,
+        email: formData.email,
+        cpf: formData.cpf,
+        role: formData.role,
+        sector: formData.sector,
+        birthDate: formData.birthDate,
+        address: {
+          street: formData.address.street,
+          number: formData.address.number,
+          complement: formData.address.complement || "",
+          neighborhood: formData.address.neighborhood,
+          city: formData.address.city,
+          state: formData.address.state,
+          zipCode: formData.address.zipCode,
+        },
+        isAdmin: formData.isAdmin,
+        status: formData.status,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Erro ao atualizar o e-mail.");
+    }
 
       onEmployeeUpdated();
       onClose();

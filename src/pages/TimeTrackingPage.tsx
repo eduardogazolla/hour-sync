@@ -32,7 +32,7 @@ const TimeTrackingPage = () => {
 
   // Função para upload e salvar justificativa
   const handleFileUpload = async () => {
-    if (!selectedFile || !selectedTimeSlot) {
+    if (!selectedFile || !selectedTimeSlot || !userId || !serverTime) {
       setUploadMessage("Por favor, selecione um arquivo e um horário para justificar.");
       return;
     }
@@ -55,6 +55,23 @@ const TimeTrackingPage = () => {
         .toISOString()
         .split("T")[0];
       const userDocRef = doc(db, "timeLogs", `${userId}_${today}`);
+
+      // Verificar se o documento já existe
+    const docSnapshot = await getDoc(userDocRef);
+    if (!docSnapshot.exists()) {
+      // Se o documento não existir, cria um novo
+      await setDoc(userDocRef, {
+        userId,
+        userName: userDisplayName,
+        date: today,
+        entries: {
+          entradaManha: "",
+          saidaManha: "",
+          entradaTarde: "",
+          saidaTarde: "",
+        },
+      });
+    }
 
       // Atualiza o Firebase com a URL da justificativa
       await updateDoc(userDocRef, {
@@ -90,7 +107,7 @@ const TimeTrackingPage = () => {
   const scheduleLimits = {
     entradaManha: { start: "07:40", end: "08:05" },
     saidaManha: { start: "12:00", end: "12:10" },
-    entradaTarde: { start: "12:50", end: "13:05" },
+    entradaTarde: { start: "12:50", end: "13:10" },
     saidaTarde: { start: "17:00", end: "17:10" },
   };
 
@@ -109,7 +126,7 @@ const TimeTrackingPage = () => {
       let serverTime = new Date(data.dateTime);
 
       if (useSimulation) {
-        const simulatedDate = "2024-12-02"; // Ajuste a data simulada
+        const simulatedDate = "2024-11-28"; // Ajuste a data simulada
         const simulatedTime = "17:00"; // Ajuste o horário simulado (HH:mm)
 
         const [year, month, day] = simulatedDate.split("-").map(Number);

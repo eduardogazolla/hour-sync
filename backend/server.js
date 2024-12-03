@@ -1,4 +1,6 @@
 // backend/api.js
+
+require('dotenv').config({ path: '../.env' });
 const express = require("express");
 const admin = require("firebase-admin");
 const schedule = require("node-schedule");
@@ -12,9 +14,17 @@ app.use(cors());
 app.use(express.json());
 
 // Inicializando Firebase Admin SDK
-admin.initializeApp({
-  credential: admin.credential.cert(require("./serviceAccountKey.json")),
-});
+
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  throw new Error("A variável FIREBASE_SERVICE_ACCOUNT não está definida.");
+}
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -204,13 +214,13 @@ app.post("/update-user", async (req, res) => {
       cpf: cpf || "",
       birthDate: birthDate || "",
       address: {
-        rua: address?.street || "",
-        numero: address?.number || "",
-        complemento: address?.complement || "",
-        bairro: address?.neighborhood || "",
-        cidade: address?.city || "",
-        estado: address?.state || "",
-        cep: address?.zipCode || "",
+        street: address?.street || "",
+        number: address?.number || "",
+        complement: address?.complement || "",
+        neighborhood: address?.neighborhood || "",
+        city: address?.city || "",
+        state: address?.state || "",
+        zipCode: address?.zipCode || "",
       },
       role: role || "",
       isAdmin: isAdmin !== undefined ? isAdmin : false,

@@ -13,6 +13,7 @@ import { db } from "../firebaseConfig";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
+
 interface Entry {
   entradaManha: string;
   saidaManha: string;
@@ -39,7 +40,6 @@ const EmployeeReport = () => {
   const { employeeId, employeeName } = state;
 
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
-  const [selectedDate, setSelectedDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${(now.getMonth() + 1)
@@ -433,12 +433,6 @@ const EmployeeReport = () => {
 
       <div className="flex space-x-4 mb-4">
         <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="p-2 bg-gray-700 rounded"
-        />
-        <input
           type="month"
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
@@ -470,7 +464,7 @@ const EmployeeReport = () => {
             const dateObj = new Date(log.date);
             const dayOfWeek = (dateObj.getDay() + 1) % 7; // 0 = Sábado, 6 = Domingo
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-            const formatField = (field, justification) => {
+            const formatField = (field: string | undefined, justification?: string) => {
               if (justification) {
                 return (
                   <a

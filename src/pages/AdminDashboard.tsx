@@ -23,7 +23,8 @@ import {
 import EmployeeFormModal from "./EmployeeFormModal";
 import EditEmployeeModal from "./EditEmployeeModal";
 import { auth, db } from "../firebaseConfig";
-import jsPDF from "jspdf";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface Employee {
   id: string;
@@ -55,7 +56,7 @@ const AdminDashboard = () => {
     key: string;
     direction: "asc" | "desc";
   } | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>(
+  const [selectedMonth] = useState<string>(
     `${new Date().getFullYear()}-${(new Date().getMonth() + 1)
       .toString()
       .padStart(2, "0")}`

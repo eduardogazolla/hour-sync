@@ -326,6 +326,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
                 name="address.zipCode"
                 value={formData.address.zipCode}
                 onChange={handleInputChange}
+                maxLength={8}
                 placeholder="12345-678"
                 required
                 className="w-full p-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
