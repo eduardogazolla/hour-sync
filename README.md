@@ -52,7 +52,7 @@ Este projeto é uma aplicação web desenvolvida para gerenciar funcionários e 
 
 ### Passo 1: Clone o repositório
    ```bash
-   git clone https://github.com/eduardogazolla/ponto-facil-1
+   git clone https://github.com/eduardogazolla/hour-sync
    ```
 
 ### Passo 2: Configure o Firebase:
@@ -89,7 +89,7 @@ Este projeto é uma aplicação web desenvolvida para gerenciar funcionários e 
     npm run dev
     ```
 4. Acesse no navegador:
-    http://localhost:5137
+    http://localhost:3000
 
 ## Estrutura de Dados no Firestore
 ### Employees
