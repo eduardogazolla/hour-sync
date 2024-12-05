@@ -1,6 +1,5 @@
-// backend/api.js
-
-require('dotenv').config({ path: '../.env' });
+// backend/server.js
+require('dotenv').config();
 const express = require("express");
 const admin = require("firebase-admin");
 const schedule = require("node-schedule");
@@ -15,12 +14,9 @@ app.use(express.json());
 
 // Inicializando Firebase Admin SDK
 
-if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  throw new Error("A variável FIREBASE_SERVICE_ACCOUNT não está definida.");
-}
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
+// Inicializa o Firebase Admin SDK com as variáveis de ambiente
 if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
@@ -191,7 +187,7 @@ app.post("/create-user", async (req, res) => {
 
 // Atualizar usuário no Firebase Authentication
 app.post("/update-user", async (req, res) => {
-  const { uid, email, displayName, cpf, birthDate, address, role, isAdmin, sector, status } = req.body;
+  const { uid, email, name, cpf, birthDate, address, role, isAdmin, sector, status } = req.body;
 
   try {
     // Verificar se o usuário existe no Firebase Authentication
@@ -200,7 +196,7 @@ app.post("/update-user", async (req, res) => {
     // Atualizar os dados no Firebase Authentication
     await admin.auth().updateUser(uid, {
       email,
-      displayName,
+      displayName: name,
     });
 
     // Atualizar os dados no Firestore
@@ -210,7 +206,7 @@ app.post("/update-user", async (req, res) => {
     // Atualiza apenas os campos enviados para evitar sobrescrever outros valores existentes
     const updatedData = {
       email: email || userRecord.email,
-      name: displayName || userRecord.displayName,
+      name: name || userRecord.displayName,
       cpf: cpf || "",
       birthDate: birthDate || "",
       address: {

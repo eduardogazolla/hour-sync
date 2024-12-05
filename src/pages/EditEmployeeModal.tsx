@@ -36,8 +36,7 @@ const EditEmployeeModal = ({
 }: EditEmployeeModalProps) => {
   const [formData, setFormData] = useState<Employee | null>(employee);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  console.error(error);
+  const [, setError] = useState("");
 
   useEffect(() => {
     if (employee) {
@@ -95,7 +94,6 @@ const EditEmployeeModal = ({
       setError("Dados inválidos. Por favor, revise o formulário.");
       return;
     }
-
     const today = new Date();
     const birthDate = new Date(
       formData.birthDate.split("/").reverse().join("-")
@@ -134,40 +132,37 @@ const EditEmployeeModal = ({
         isAdmin: formData.isAdmin,
         status: formData.status,
       });
-
-      // Atualiza o email no Firebase Authentication
-    const response = await fetch("http://localhost:5000/update-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        uid: formData.id,  // O ID do funcionário no Firestore
-        name: formData.name,
-        email: formData.email,
-        cpf: formData.cpf,
-        role: formData.role,
-        sector: formData.sector,
-        birthDate: formData.birthDate,
-        address: {
-          street: formData.address.street,
-          number: formData.address.number,
-          complement: formData.address.complement || "",
-          neighborhood: formData.address.neighborhood,
-          city: formData.address.city,
-          state: formData.address.state,
-          zipCode: formData.address.zipCode,
+      const response = await fetch("http://localhost:5000/update-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        isAdmin: formData.isAdmin,
-        status: formData.status,
-      }),
-    });
+        body: JSON.stringify({
+          uid: formData.id,
+          email: formData.email,
+          name: formData.name,
+          cpf: formData.cpf,
+          birthDate: formData.birthDate,
+          address: {
+            street: formData.address.street,
+            number: formData.address.number,
+            complement: formData.address.complement || "",
+            neighborhood: formData.address.neighborhood,
+            city: formData.address.city,
+            state: formData.address.state,  
+            zipCode: formData.address.zipCode,
+          },
+          role: formData.role,
+          sector: formData.sector,
+          isAdmin: formData.isAdmin,
+          status: formData.status,
+        }),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Erro ao atualizar o e-mail.");
-    }
-
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao atualizar o e-mail.");
+      }
       onEmployeeUpdated();
       onClose();
     } catch (error) {
@@ -178,41 +173,14 @@ const EditEmployeeModal = ({
     }
   };
 
-  const isFormValid = () => {
-    const requiredFields = [
-      "name",
-      "cpf",
-      "email",
-      "role",
-      "sector",
-      "birthDate",
-      "address.street",
-      "address.number",
-      "address.neighborhood",
-      "address.city",
-      "address.state",
-      "address.zipCode",
-    ];
-
-    return requiredFields.every((field) => {
-      const keys = field.split(".");
-      let value = formData as any;
-
-      for (const key of keys) {
-        value = value[key];
-        if (!value) return false;
-      }
-
-      return true;
-    });
-  };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-3xl w-full text-white">
         <h2 className="text-2xl font-semibold mb-4">Editar {formData?.name}</h2>
         {loading && (
-          <p className="mb-4 text-center text-blue-400">Salvando alterações...</p>
+          <p className="mb-4 text-center text-blue-400">
+            Salvando alterações...
+          </p>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -388,7 +356,7 @@ const EditEmployeeModal = ({
           </div>
           <button
             type="submit"
-            disabled={loading || !isFormValid()}
+            disabled={loading}
             className={`w-full bg-green-600 py-2 rounded text-white font-bold ${
               loading ? "opacity-50 cursor-not-allowed" : "hover:bg-green-700"
             }`}
