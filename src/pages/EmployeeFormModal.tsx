@@ -105,7 +105,7 @@ const EmployeeFormModal = ({ onClose, onEmployeeAdded }: any) => {
 
     try {
       // Envia para o backend para criação de usuário
-      const response = await fetch("http://localhost:5000/create-user", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/create-user`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

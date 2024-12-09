@@ -43,7 +43,7 @@ const TimeTrackingPage = () => {
     try {
       // Faz o upload do arquivo para o servidor
       const response = await axios.post(
-        "http://localhost:5000/upload-justification",
+        `${import.meta.env.VITE_BACKEND_URL}/upload-justification`,
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
