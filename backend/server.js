@@ -356,8 +356,12 @@ app.post("/", async (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.send("Backend funcionando!");
+});
+
 // Iniciar o servidor
-const PORT = 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
-  console.log(`API rodando na porta http://localhost:${PORT}`)
+  console.log(`Servidor rodando na porta http://localhost:${PORT}`)
 );
