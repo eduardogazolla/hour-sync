@@ -417,7 +417,7 @@ const AdminDashboard = () => {
       await updateDoc(employeeRef, { status: newStatus });
 
       // Atualizar o status no Firebase Authentication via API backend
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/toggle-user-status`, {
+      const response = await fetch("https://hour-sync-backend.vercel.app/toggle-user-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

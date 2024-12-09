@@ -43,7 +43,7 @@ const TimeTrackingPage = () => {
     try {
       // Faz o upload do arquivo para o servidor
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/upload-justification`,
+        "https://hour-sync-backend.vercel.app/upload-justification",
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
@@ -122,7 +122,7 @@ const TimeTrackingPage = () => {
       }
       const data = await response.json();
 
-      const useSimulation = true; // Altere para `false` em produção
+      const useSimulation = false; // Altere para `false` em produção
       let serverTime = new Date(data.dateTime);
 
       if (useSimulation) {

@@ -24,7 +24,8 @@ dist-ssr
 *.sw?
 
 serviceAccountKey.json
-uploads
+# tmp
+# uploads
 .env
 
 .vercel

@@ -132,7 +132,7 @@ const EditEmployeeModal = ({
         isAdmin: formData.isAdmin,
         status: formData.status,
       });
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/update-user`, {
+      const response = await fetch("https://hour-sync-backend.vercel.app/update-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -22,10 +22,15 @@ if (!admin.apps.length) {
   });
 }
 
+const uploadDir = '/tmp/uploads';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, "uploads/");
+      cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
       cb(null, `${Date.now()}-${file.originalname}`);
@@ -47,19 +52,38 @@ app.post("/upload-justification", upload.single("file"), (req, res) => {
     if (!req.file) {
       return res.status(400).send({ error: "Nenhum arquivo enviado!" });
     }
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-    res.status(200).send({ fileUrl });
+
+    // Gera a URL de download com base no novo endpoint
+    const fileUrl = `${req.protocol}://${req.get("host")}/download-justification/${req.file.filename}`;
+
+    res.status(200).send({ message: "Arquivo enviado com sucesso!", fileUrl });
   } catch (error) {
     console.error("Erro no upload:", error.message);
     res.status(500).send({ error: "Erro interno no servidor." });
   }
 });
 
-const uploadDir = path.join(__dirname, "uploads");
+app.get("/download-justification/:filename", (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(uploadDir, filename);
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
+    // Verifica se o arquivo existe no diretório temporário
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, filename, (err) => {
+        if (err) {
+          console.error("Erro ao enviar o arquivo:", err.message);
+          res.status(500).send({ error: "Erro ao fazer o download do arquivo." });
+        }
+      });
+    } else {
+      res.status(404).send({ error: "Arquivo não encontrado." });
+    }
+  } catch (error) {
+    console.error("Erro no download do arquivo:", error.message);
+    res.status(500).send({ error: "Erro interno no servidor." });
+  }
+});
 
 // Middleware para servir arquivos estáticos da pasta uploads
 app.post('/uploads', (req, res) => {
@@ -361,7 +385,7 @@ app.get("/", (req, res) => {
 });
 
 // Iniciar o servidor
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`Servidor rodando na porta http://localhost:${PORT}`)
 );
